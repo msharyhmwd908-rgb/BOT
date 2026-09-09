@@ -3,7 +3,7 @@ from discord.ext import commands
 
 class StoreView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None) # أزرار دائمة بدون انتهاء
 
     @discord.ui.button(label="دخول المتجر", style=discord.ButtonStyle.secondary, emoji="🛍️", custom_id="persistent_store_enter")
     async def enter_store(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -38,7 +38,7 @@ class Store(commands.Cog):
     @discord.app_commands.command(name="store", description="إرسال لوحة المتجر الرئيسية")
     async def store_panel(self, interaction: discord.Interaction):
         embed = discord.Embed(color=discord.Color.from_rgb(0, 150, 255))
-        embed.set_image(url="ضع_رابط_الصورة_المباشر_هنا")
+        embed.set_image(url="https://h.top4top.io/p_39044coda0.png")
         await interaction.response.send_message(embed=embed, view=StoreView())
 
 async def setup(bot):
