@@ -11,7 +11,6 @@ class StoreView(discord.ui.View):
 
     @discord.ui.button(label="توجه إلى الإدارة", style=discord.ButtonStyle.danger, emoji="🛠️", custom_id="persistent_store_admin")
     async def contact_admin(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # يرسل له رسالة خاصة سرية تحتوي على منشن روم التكت المباشر
         await interaction.response.send_message("إذا واجهتك أي مشكلة أثناء الشراء، يرجى التوجه فوراً إلى روم التكت الخاص بالإدارة هنا: <#1542935432445165689>", ephemeral=True)
 
     @discord.ui.button(label="معلومات المتجر", style=discord.ButtonStyle.primary, emoji="ℹ️", custom_id="persistent_store_info")
@@ -35,6 +34,8 @@ class StoreView(discord.ui.View):
 class Store(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # تسجيل الأزرار الدائمة لكي تعمل استجابتها فور تشغيل البوت
+        self.bot.add_view(StoreView())
 
     @discord.app_commands.command(name="store", description="إرسال لوحة متجرنا الكبيرة والأزرار الدائمة")
     async def store_panel(self, interaction: discord.Interaction):
