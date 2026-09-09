@@ -2,7 +2,6 @@ import os
 import asyncio
 import discord
 from discord.ext import commands
-from keep_alive import keep_alive
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -23,7 +22,6 @@ async def load_extensions():
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
 async def main():
-    keep_alive()
     async with bot:
         await load_extensions()
         TOKEN = os.getenv('DISCORD_TOKEN')
