@@ -74,7 +74,7 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
         embed.add_field(name="صاحب الفكرة", value=interaction.user.mention, inline=False)
         embed.add_field(name="التقييم والستريك", value="🕯️ الستريك: 0 | ⭐ التقييم: 0.0 (0) | ❌ رفض: 0", inline=False)
         
-        view = SuggestionView(s_id)
+        view = SuggestionView()
         
         await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("✅ تم إرسال فكرتك بنجاح وتوثيقها!", ephemeral=True)
@@ -101,18 +101,26 @@ class ColorSelectView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 class SuggestionView(discord.ui.View):
-    def __init__(self, s_id: str):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.s_id = s_id
 
-    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id="vote_btn_action")
+    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id="persistent_vote_btn")
     async def vote_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-        if self.s_id not in data["suggestions"]:
-            await interaction.response.send_message("❌ هذه الفكرة غير موجودة.", ephemeral=True)
+        embed = interaction.message.embeds[0]
+        # استخراج رقم الفكرة من عنوان اليمبد (مثال: "💡 فكرة رقم #1")
+        try:
+            title_parts = embed.title.split("#")
+            s_id = title_parts[1].strip()
+        except:
+            await interaction.response.send_message("❌ حدث خطأ أثناء قراءة رقم الفكرة.", ephemeral=True)
             return
 
-        s_data = data["suggestions"][self.s_id]
+        data = load_data()
+        if s_id not in data["suggestions"]:
+            await interaction.response.send_message("❌ هذه الفكرة غير موجودة في قاعدة البيانات.", ephemeral=True)
+            return
+
+        s_data = data["suggestions"][s_id]
         user_id_str = str(interaction.user.id)
 
         if user_id_str in s_data["voters"]:
@@ -145,7 +153,6 @@ class SuggestionView(discord.ui.View):
 
         save_data(data)
 
-        embed = interaction.message.embeds[0]
         ratings = s_data["ratings"]
         avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
         
@@ -158,9 +165,17 @@ class SuggestionView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(action_msg, ephemeral=True)
 
-    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id="rate_btn_action")
+    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id="persistent_rate_btn")
     async def rate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(RateModal(self.s_id))
+        embed = interaction.message.embeds[0]
+        try:
+            title_parts = embed.title.split("#")
+            s_id = title_parts[1].strip()
+        except:
+            await interaction.response.send_message("❌ حدث خطأ أثناء قراءة رقم الفكرة.", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(RateModal(s_id))
 
 class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
     def __init__(self, s_id: str):
@@ -221,7 +236,7 @@ class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
             inline=False
         )
         
-        view = SuggestionView(self.s_id)
+        view = SuggestionView()
         await msg.edit(embed=embed, view=view)
         await interaction.response.send_message(f"✅ تم تسجيل تقييمك ({score}) بنجاح!", ephemeral=True)
 
