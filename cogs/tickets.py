@@ -27,6 +27,15 @@ def get_next_ticket_number():
     return num
 
 tickets_db = {}
+call_admin_counts = {}
+
+def check_admin_permission(interaction: discord.Interaction) -> bool:
+    role = interaction.guild.get_role(ADMIN_ROLE_ID)
+    if interaction.user.id == OWNER_ID or interaction.user.guild_permissions.administrator:
+        return True
+    if role and role in interaction.user.roles:
+        return True
+    return False
 
 class TicketModal(discord.ui.Modal):
     def __init__(self, ticket_type: str):
@@ -66,7 +75,6 @@ class TicketModal(discord.ui.Modal):
         category = guild.get_channel(TICKET_CATEGORY_ID)
         admin_role = guild.get_role(ADMIN_ROLE_ID)
 
-        # ضبط الصلاحيات: الأعضاء العاديين لا يرون القناة، فاتح التكت ورتبة الإدارة يرونها
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
@@ -74,7 +82,7 @@ class TicketModal(discord.ui.Modal):
         }
 
         if admin_role:
-            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True, send_messages=False, read_message_history=True)
+            overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
         ticket_number = get_next_ticket_number()
         channel_name = f"ticket-{ticket_number:04d}"
@@ -82,7 +90,7 @@ class TicketModal(discord.ui.Modal):
         try:
             ticket_channel = await guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
         except Exception as e:
-            await interaction.followup.send(f"❌ حدث خطأ أثناء إنشاء القناة (تأكد من صلاحيات البوت وأيدي الفئة): {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ حدث خطأ أثناء إنشاء القناة: {e}", ephemeral=True)
             return
 
         target_txt = self.target_user.value if self.target_user else "لا يوجد"
@@ -146,19 +154,19 @@ class TicketSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v2", emoji="❓")
+    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v4", emoji="❓")
     async def query_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("إستفسار"))
 
-    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v2", emoji="⚠️")
+    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v4", emoji="⚠️")
     async def member_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على عضو"))
 
-    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v2", emoji="🛡️")
+    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v4", emoji="🛡️")
     async def admin_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على إداري"))
 
-    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v2", emoji="🛠️")
+    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v4", emoji="🛠️")
     async def support_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("دعم فني"))
 
@@ -214,17 +222,17 @@ class RatingView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1_v2")
+    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1_v4")
     async def r1(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "1 نجمة")
-    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2_v2")
+    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2_v4")
     async def r2(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "2 نجوم")
-    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3_v2")
+    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3_v4")
     async def r3(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "3 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4_v2")
+    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4_v4")
     async def r4(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "4 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5_v2")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5_v4")
     async def r5(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "5 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6_v2")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6_v4")
     async def r6(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "6 نجوم (ممتاز جداً)")
 
     async def rate_cb(self, interaction: discord.Interaction, rating: str):
@@ -264,6 +272,9 @@ class PunishSelect(discord.ui.Select):
     def __init__(self, options):
         super().__init__(placeholder="اختر العضو لمعاقبته...", options=options)
     async def callback(self, interaction: discord.Interaction):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         member = interaction.guild.get_member(int(self.values[0]))
         await interaction.response.send_modal(PunishmentModal(member))
 
@@ -278,6 +289,9 @@ class UserSelect(discord.ui.Select):
     def __init__(self, options):
         super().__init__(placeholder="اختر الشخص لإدخاله للتكت...", options=options)
     async def callback(self, interaction: discord.Interaction):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         member = interaction.guild.get_member(int(self.values[0]))
         channel = interaction.channel
         await channel.set_permissions(member, view_channel=True, send_messages=True, read_message_history=True)
@@ -289,20 +303,16 @@ class TicketControlView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    def is_admin(self, interaction: discord.Interaction) -> bool:
-        role = interaction.guild.get_role(ADMIN_ROLE_ID)
-        return (role in interaction.user.roles) or (interaction.user.id == OWNER_ID) or interaction.user.guild_permissions.administrator
-
-    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v2", emoji="🙋‍♂️")
+    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v4", emoji="🙋‍♂️")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.is_admin(interaction):
-            await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
             return
 
         channel = interaction.channel
         data = tickets_db.get(channel.id, {})
         if data.get("claimed_by") != "—":
-            await interaction.response.send_message(f"❌ مافيه، التكت ذا مستلمه إداري ثاني مسبقاً!", ephemeral=True)
+            await interaction.response.send_message(f"❌ التكت هذا مستلمه إداري آخر مسبقاً!", ephemeral=True)
             return
 
         data["claimed_by"] = interaction.user.mention
@@ -312,26 +322,37 @@ class TicketControlView(discord.ui.View):
         if admin_role:
             await channel.set_permissions(admin_role, send_messages=True)
 
-        await interaction.response.send_message(f"✅ قام الإداري {interaction.user.mention} باستلام التكت بنجاح!", ephemeral=False)
+        await interaction.response.send_message(f"✅ قام {interaction.user.mention} باستلام التكت بنجاح!", ephemeral=False)
 
-    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v2", emoji="🔒")
+    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v4", emoji="🔒")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.is_admin(interaction):
-            await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
             return
         await interaction.response.send_modal(CloseReasonModal())
 
-    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v2", emoji="🚨")
+    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v4", emoji="🚨")
     async def call_admin(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.is_admin(interaction):
-            await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
+        channel_id = interaction.channel.id
+        user_id = interaction.user.id
+        
+        # تتبع عدد مرات استخدام الزر (3 مرات فقط لكل مستخدم في التكت الواحد)
+        key = (channel_id, user_id)
+        count = call_admin_counts.get(key, 0)
+        
+        if count >= 3:
+            await interaction.response.send_message("❌ لقد استنفذت الحد الأقصى لاستدعاء الإدارة (3 مرات فقط في هذا التكت).", ephemeral=True)
             return
-        await interaction.response.send_message(f"🚨 تم استدعاء الإدارة العامة بنجاح بواسطة {interaction.user.mention} <@&{ADMIN_ROLE_ID}>", ephemeral=False)
+            
+        call_admin_counts[key] = count + 1
+        remaining = 3 - call_admin_counts[key]
+        
+        await interaction.response.send_message(f"🚨 تم استدعاء الإدارة العامة بنجاح بواسطة {interaction.user.mention} <@&{ADMIN_ROLE_ID}>\n*(المحاولات المتبقية لك: {remaining})*", ephemeral=False)
 
-    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v2", emoji="⚙️")
+    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v4", emoji="⚙️")
     async def other_options(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.is_admin(interaction):
-            await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
             return
         await interaction.response.send_message("اختر الإجراء المطلوب:", view=OtherOptionsSubView(interaction.guild), ephemeral=True)
 
@@ -342,18 +363,30 @@ class OtherOptionsSubView(discord.ui.View):
 
     @discord.ui.button(label="ادخال شخص", style=discord.ButtonStyle.primary, emoji="➕")
     async def add_person(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         await interaction.response.send_message("اختر الشخص الذي تريد إدخاله:", view=AddUserSelectView(self.guild), ephemeral=True)
 
     @discord.ui.button(label="معاقبة", style=discord.ButtonStyle.danger, emoji="⚖️")
     async def punish_person(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         await interaction.response.send_message("اختر العضو المراد معاقبته:", view=SelectPunishUserView(self.guild), ephemeral=True)
 
     @discord.ui.button(label="منشن الاونر", style=discord.ButtonStyle.secondary, emoji="👑")
     async def mention_owner(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         await interaction.response.send_message(f"👑 تنبيه للـ Owner: <@{OWNER_ID}> تم استدعاؤك بواسطة {interaction.user.mention}", ephemeral=False)
 
     @discord.ui.button(label="ارسل نسخ احتياطيه", style=discord.ButtonStyle.success, emoji="📁")
     async def send_transcript_manual(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
+            return
         channel = interaction.channel
         history_msgs = [f"[{m.created_at.strftime('%Y-%m-%d %H:%M:%S')}] {m.author}: {m.content}" async for m in channel.history(limit=None, oldest_first=True)]
         log_text = f"نسخة احتياطية يدوية للتكت: {channel.name}\n" + "\n".join(history_msgs)
@@ -375,10 +408,10 @@ class TicketsCog(commands.Cog):
 
     @app_commands.command(name="setup_ticket", description="إرسال لوحة فتح التكتات الرئيسية")
     async def setup_ticket(self, interaction: discord.Interaction):
-        if interaction.user.id != OWNER_ID and not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر.", ephemeral=True)
+        if not check_admin_permission(interaction):
+            await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
             return
-
+        
         await interaction.response.send_message("✅ جاري إرسال لوحة التكتات...", ephemeral=True)
         
         embed = discord.Embed(
