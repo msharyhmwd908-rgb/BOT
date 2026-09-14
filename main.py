@@ -3,7 +3,6 @@ import asyncio
 import discord
 from discord.ext import commands
 
-# تفعيل الـ Intents بالكامل لضمان قراءة البيانات والمنشنات
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -12,12 +11,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    # تسجيل الـ Views الدائمة لكي تعمل الأزرار حتى بعد عمل Restart
+    # تسجيل الـ Views الدائمة عشان الأزرار تشتغل دائماً وبدون انقطاع
     try:
         from cogs.suggestions import MainPanelView, ColorSelectView, SuggestionActionView
         bot.add_view(MainPanelView())
         bot.add_view(ColorSelectView())
         bot.add_view(SuggestionActionView())
+        print("تم تسجيل الأزرار الدائمة (Persistent Views) بنجاح.")
     except Exception as e:
         print(f"خطأ في تسجيل الـ Views: {e}")
 
