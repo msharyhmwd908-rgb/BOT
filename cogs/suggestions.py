@@ -1,11 +1,11 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import os
 
 DATA_FILE = "suggestions_data.json"
 
-# تحميل أو إنشاء بيانات الأفكار
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -19,7 +19,6 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# الألوان الـ 13 المطلوبة مع أكواد الألوان الهيكلية (Hex)
 COLORS = {
     "أصفر": 0xF1C40F,
     "أحمر": 0xE74C3C,
@@ -54,7 +53,6 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
         data["count"] += 1
         s_id = str(data["count"])
         
-        # حفظ بيانات الفكرة
         data["suggestions"][s_id] = {
             "author_id": interaction.user.id,
             "text": self.idea_input.value,
@@ -67,7 +65,6 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
         }
         save_data(data)
 
-        # بناء رسالة الفكرة بلون الإطار الذي اختاره العضو
         embed = discord.Embed(
             title=f"💡 فكرة رقم #{s_id}",
             description=f"**{self.idea_input.value}**",
@@ -86,7 +83,6 @@ class ColorSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         
-        # إنشاء القائمة المنسدلة للـ 13 لوناً
         options = [discord.SelectOption(label=name, value=name) for name in COLORS.keys()]
         
         self.select_menu = discord.ui.Select(
@@ -106,10 +102,10 @@ class ColorSelectView(discord.ui.View):
 
 class SuggestionView(discord.ui.View):
     def __init__(self, s_id: str):
-        super().__init__(timeout=None) # مهلة غير محدودة
+        super().__init__(timeout=None)
         self.s_id = s_id
 
-    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id=f"vote_btn_{s_id}")
+    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id="vote_btn_action")
     async def vote_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         if self.s_id not in data["suggestions"]:
@@ -128,7 +124,6 @@ class SuggestionView(discord.ui.View):
             s_data["streak"] += 1
             action_msg = "تم تسجيل صوتك بنجاح!"
 
-        # تحديد لون الستريك وتغييره حسب الأرقام المطلوبة
         streak = s_data["streak"]
         if streak >= 20:
             streak_icon = "🕯️🔥 [اللون النهائي 20+]"
@@ -150,7 +145,6 @@ class SuggestionView(discord.ui.View):
 
         save_data(data)
 
-        # تحديث الرسالة
         embed = interaction.message.embeds[0]
         ratings = s_data["ratings"]
         avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
@@ -161,10 +155,10 @@ class SuggestionView(discord.ui.View):
             value=f"{streak_icon} | ⭐ التقييم: {avg_rating} ({len(ratings)}) | ❌ رفض: {s_data['rejections']}",
             inline=False
         )
-        await interaction.message.edit(embed=embed)
+        await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(action_msg, ephemeral=True)
 
-    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id=f"rate_btn_{s_id}")
+    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id="rate_btn_action")
     async def rate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(RateModal(self.s_id))
 
@@ -231,7 +225,6 @@ class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
         await msg.edit(embed=embed, view=view)
         await interaction.response.send_message(f"✅ تم تسجيل تقييمك ({score}) بنجاح!", ephemeral=True)
 
-
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -240,7 +233,6 @@ class MainPanelView(discord.ui.View):
     async def open_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = ColorSelectView()
         await interaction.response.send_message("اختر لون الفكرة المناسب لتظهر رسالتك به:", view=view, ephemeral=True)
-
 
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot):
