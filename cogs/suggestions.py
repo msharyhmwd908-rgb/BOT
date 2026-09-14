@@ -37,24 +37,20 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True, ephemeral=True)
         
-        # إنشاء اليمبد مع منشن العضو والصورة المطلوبة وبدون ستريك
         embed = discord.Embed(
             title="💡 • اقتراح جديد",
             description=f"**صاحب الاقتراح:** {interaction.user.mention}\n**الفكرة:**\n{self.suggestion_input.value}",
-        color=self.color_hex
+            color=self.color_hex
         )
         embed.add_field(name="👍 المؤيدون (0)", value="لا يوجد حالياً", inline=False)
         embed.add_field(name="👎 المعارضون (0)", value="لا يوجد حالياً", inline=False)
         embed.set_footer(text=f"التصنيف: {self.color_name}")
         embed.set_image(url="https://b.top4top.io/p_3909j0hu80.png")
         
-        # إرسال الاقتراح للقناة مع أزرار التفاعل
         await interaction.channel.send(embed=embed, view=SuggestionActionView())
-        
-        # إرسال رسالة تأكيد مؤقتة ثم حذفها أو إخفاؤها
         await interaction.followup.send("✅ تم إرسال فكرتك بنجاح!", ephemeral=True)
 
-# قائمة اختيار الألوان الـ 13
+# قائمة اختيار الألوان (تم تغيير الـ custom_id لتجاوز الكاش)
 class ColorSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -63,7 +59,7 @@ class ColorSelectView(discord.ui.View):
         placeholder="اختر لون الفئة الخاصة باقتراحك...",
         min_values=1,
         max_values=1,
-        custom_id="suggestion_color_select",
+        custom_id="suggestion_color_select_v2",
         options=[
             discord.SelectOption(label="أحمر", value="Red", description="اقتراحات عامة أو عاجلة", emoji="🔴"),
             discord.SelectOption(label="أزرق", value="Blue", description="تطويرات برمجية أو بوتات", emoji="🔵"),
@@ -91,35 +87,33 @@ class ColorSelectView(discord.ui.View):
         selected_label = select.values[0]
         color_hex = colors_map.get(selected_label, 0x3498DB)
         
-        # فتح المودال وحذف رسالة اختيار اللون فوراً لتبقى الشاشة نظيفة
+        # فتح المودال وحذف رسالة اختيار اللون فوراً
         await interaction.response.send_modal(SuggestionModal(color_name=selected_label, color_hex=color_hex))
 
-# اللوحة الرئيسية
+# اللوحة الرئيسية (تم تغيير الـ custom_id لتجاوز الكاش)
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="شارك فكرتك", style=discord.ButtonStyle.primary, custom_id="main_share_idea_btn", emoji="💡")
+    @discord.ui.button(label="شارك فكرتك", style=discord.ButtonStyle.primary, custom_id="main_share_idea_btn_v2", emoji="💡")
     async def share_idea_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = ColorSelectView()
         await interaction.response.send_message("اختر تصنيف لون فكرتك من القائمة أدناه:", view=view, ephemeral=True)
 
-# أزرار التفاعل (تأييد / معارضة) مع تحديث القوائم والمنشنات
+# أزرار التفاعل (تأييد / معارضة)
 class SuggestionActionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="👍 تأييد", style=discord.ButtonStyle.success, custom_id="sug_upvote_btn")
+    @discord.ui.button(label="👍 تأييد", style=discord.ButtonStyle.success, custom_id="sug_upvote_btn_v2")
     async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         message = interaction.message
         embed = message.embeds[0]
         
-        # تحديث حقل المؤيدين
         upvote_field_index = 0
         current_field = embed.fields[upvote_field_index]
         current_value = current_field.value
-        
         user_mention = interaction.user.mention
         
         if "لا يوجد حالياً" in current_value:
@@ -129,7 +123,7 @@ class SuggestionActionView(discord.ui.View):
             if user_mention not in supporters:
                 supporters.append(user_mention)
             else:
-                supporters.remove(user_mention) # إلغاء التأييد لو ضغط مرة ثانية
+                supporters.remove(user_mention)
                 
         new_value = "\n".join(supporters) if supporters else "لا يوجد حالياً"
         embed.set_field_at(
@@ -142,7 +136,7 @@ class SuggestionActionView(discord.ui.View):
         await message.edit(embed=embed)
         await interaction.followup.send("✅ تم تحديث تصويتك بنجاح!", ephemeral=True)
 
-    @discord.ui.button(label="👎 معارضة", style=discord.ButtonStyle.danger, custom_id="sug_downvote_btn")
+    @discord.ui.button(label="👎 معارضة", style=discord.ButtonStyle.danger, custom_id="sug_downvote_btn_v2")
     async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         message = interaction.message
@@ -151,7 +145,6 @@ class SuggestionActionView(discord.ui.View):
         downvote_field_index = 1
         current_field = embed.fields[downvote_field_index]
         current_value = current_field.value
-        
         user_mention = interaction.user.mention
         
         if "لا يوجد حالياً" in current_value:
@@ -172,7 +165,7 @@ class SuggestionActionView(discord.ui.View):
         )
         
         await message.edit(embed=embed)
-        await interaction.followup.send("❌ تم تحديث تصويتك بنجاح!", ephemeral=True)
+        await interaction.followup.send("✅ تم تحديث تصويتك بنجاح!", ephemeral=True)
 
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot):
@@ -187,10 +180,16 @@ class SuggestionsCog(commands.Cog):
             description="نحن نرحب بكافة آرائك واقتراحاتك البناءة لتطوير السيرفر وجعله أفضل دائماً.\nاضغط على الزر أدناه للبدء في كتابة فكرتك واختيار لونها الخاص!",
             color=0x9B59B6
         )
+        # الصورة الجديدة المطلوبة بدون أي لخبطة
         embed.set_image(url="https://b.top4top.io/p_3909j0hu80.png")
         
         view = MainPanelView()
         await interaction.channel.send(embed=embed, view=view)
 
 async def setup(bot):
+    # مزامنة الأوامر تلقائياً لتحديث الكاش فوراً
     await bot.add_cog(SuggestionsCog(bot))
+    try:
+        await bot.tree.sync()
+    except Exception as e:
+        print(f"Failed to sync tree: {e}")
