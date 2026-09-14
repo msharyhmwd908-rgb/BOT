@@ -62,11 +62,12 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
             "streak": 0,
             "voters": [],
             "ratings": [],
-            "rejections": 0
+            "rejections": 0,
+            "dm_sent": False
         }
         save_data(data)
 
-        # بناء رسالة الفكرة
+        # بناء رسالة الفكرة بلون الإطار الذي اختاره العضو
         embed = discord.Embed(
             title=f"💡 فكرة رقم #{s_id}",
             description=f"**{self.idea_input.value}**",
@@ -78,7 +79,6 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
         
         view = SuggestionView(s_id)
         
-        # إرسال الفكرة في نفس القناة أو قناة مخصصة (هنا ترسل في نفس القناة التي ضغط فيها العضو)
         await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("✅ تم إرسال فكرتك بنجاح وتوثيقها!", ephemeral=True)
 
@@ -94,7 +94,7 @@ class ColorSelectView(discord.ui.View):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="color_select_menu"
+            custom_id="color_select_menu_persistent"
         )
         self.select_menu.callback = self.select_callback
         self.add_item(self.select_menu)
@@ -106,10 +106,10 @@ class ColorSelectView(discord.ui.View):
 
 class SuggestionView(discord.ui.View):
     def __init__(self, s_id: str):
-        super().__init__(timeout=None) # مهلة غير محدودة كما طلبت
+        super().__init__(timeout=None) # مهلة غير محدودة
         self.s_id = s_id
 
-    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id="vote_btn")
+    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id=f"vote_btn_{s_id}")
     async def vote_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         if self.s_id not in data["suggestions"]:
@@ -120,21 +120,18 @@ class SuggestionView(discord.ui.View):
         user_id_str = str(interaction.user.id)
 
         if user_id_str in s_data["voters"]:
-            # سحب التصويت
             s_data["voters"].remove(user_id_str)
             s_data["streak"] = max(0, s_data["streak"] - 1)
             action_msg = "تم سحب تصويتك بنجاح."
         else:
-            # إضافة تصويت
             s_data["voters"].append(user_id_str)
             s_data["streak"] += 1
             action_msg = "تم تسجيل صوتك بنجاح!"
 
-        # تحديد لون الستريك بناءً على العدد
+        # تحديد لون الستريك وتغييره حسب الأرقام المطلوبة
         streak = s_data["streak"]
         if streak >= 20:
             streak_icon = "🕯️🔥 [اللون النهائي 20+]"
-            # التحقق إذا وصل 20 ولم يتم إرسال رسالة الخاصة سابقاً
             if not s_data.get("dm_sent", False):
                 s_data["dm_sent"] = True
                 try:
@@ -155,7 +152,6 @@ class SuggestionView(discord.ui.View):
 
         # تحديث الرسالة
         embed = interaction.message.embeds[0]
-        # حساب متوسط التقييم
         ratings = s_data["ratings"]
         avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
         
@@ -168,7 +164,7 @@ class SuggestionView(discord.ui.View):
         await interaction.message.edit(embed=embed)
         await interaction.response.send_message(action_msg, ephemeral=True)
 
-    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id="rate_btn")
+    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id=f"rate_btn_{s_id}")
     async def rate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(RateModal(self.s_id))
 
@@ -206,7 +202,6 @@ class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
 
         save_data(data)
 
-        # تحديث المظهر في الرسالة
         msg = interaction.message
         embed = msg.embeds[0]
         streak = s_data["streak"]
@@ -232,7 +227,6 @@ class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
             inline=False
         )
         
-        # استرجاع الـ View الحالي للرسالة وتحديثها
         view = SuggestionView(self.s_id)
         await msg.edit(embed=embed, view=view)
         await interaction.response.send_message(f"✅ تم تسجيل تقييمك ({score}) بنجاح!", ephemeral=True)
@@ -242,9 +236,8 @@ class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="انتقل للإدارة (شارك فكرتك)", style=discord.ButtonStyle.primary, custom_id="open_suggestion_menu_btn")
+    @discord.ui.button(label="انتقل للإدارة (شارك فكرتك)", style=discord.ButtonStyle.primary, custom_id="open_suggestion_menu_persistent_btn")
     async def open_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # تفتح للمستخدم قائمة اختيار الألوان عندما يضغط الزر الموجود *داخل* اللوحة
         view = ColorSelectView()
         await interaction.response.send_message("اختر لون الفكرة المناسب لتظهر رسالتك به:", view=view, ephemeral=True)
 
@@ -253,10 +246,9 @@ class SuggestionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="setup_suggestions")
-    @commands.has_permissions(administrator=True)
-    async def setup_suggestions(self, ctx):
-        """أمر إداري لإرسال اللوحة الرئيسية"""
+    @app_commands.command(name="setup_suggestions", description="إرسال لوحة شارك أفكارك لتطوير السيرفر")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setup_suggestions(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="✨ شارك أفكارك معنا لتطوير السيرفر",
             description="نحن نرحب بكافة آرائك واقترحاتك البناءة لتطوير السيرفر وجعله أفضل دائماً.\nاضغط على الزر أدناه للبدء في كتابة فكرتك واختيار لونها الخاص!",
@@ -265,8 +257,8 @@ class SuggestionsCog(commands.Cog):
         embed.set_image(url="https://f.top4top.io/p_3909ea6fn0.png")
         
         view = MainPanelView()
-        await ctx.send(embed=embed, view=view)
-        await ctx.message.delete()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ تمت إرسال لوحة الأفكار بنجاح!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(SuggestionsCog(bot))
