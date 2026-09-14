@@ -1,3 +1,4 @@
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -9,7 +10,22 @@ ADMIN_ROLE_ID = 1498008105819177240
 LOG_CHANNEL_ID = 1495450684731162664
 TICKET_CATEGORY_ID = 1548014683695620116
 
-# قاموس لتخزين بيانات التكتات المؤقتة
+COUNTER_FILE = "ticket_counter.txt"
+
+def get_next_ticket_number():
+    if not os.path.exists(COUNTER_FILE):
+        with open(COUNTER_FILE, "w") as f:
+            f.write("1")
+        return 1
+    with open(COUNTER_FILE, "r") as f:
+        try:
+            num = int(f.read().strip())
+        except:
+            num = 1
+    with open(COUNTER_FILE, "w") as f:
+        f.write(str(num + 1))
+    return num
+
 tickets_db = {}
 
 class TicketModal(discord.ui.Modal):
@@ -20,7 +36,7 @@ class TicketModal(discord.ui.Modal):
         if ticket_type in ["شكوى على عضو", "شكوى على إداري"]:
             self.target_user = discord.ui.TextInput(
                 label="يوزر الشخص (بالاسم تماماً وليس الآيدي)",
-                placeholder="مثلا: username أو الاسم",
+                placeholder="مثلا: username",
                 required=True,
                 max_length=100
             )
@@ -50,6 +66,7 @@ class TicketModal(discord.ui.Modal):
         category = guild.get_channel(TICKET_CATEGORY_ID)
         admin_role = guild.get_role(ADMIN_ROLE_ID)
 
+        # ضبط الصلاحيات: الأعضاء العاديين لا يرون القناة، فاتح التكت ورتبة الإدارة يرونها
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
@@ -59,8 +76,14 @@ class TicketModal(discord.ui.Modal):
         if admin_role:
             overwrites[admin_role] = discord.PermissionOverwrite(view_channel=True, send_messages=False, read_message_history=True)
 
-        channel_name = f"ticket-{interaction.user.name}"
-        ticket_channel = await guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+        ticket_number = get_next_ticket_number()
+        channel_name = f"ticket-{ticket_number:04d}"
+        
+        try:
+            ticket_channel = await guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+        except Exception as e:
+            await interaction.followup.send(f"❌ حدث خطأ أثناء إنشاء القناة (تأكد من صلاحيات البوت وأيدي الفئة): {e}", ephemeral=True)
+            return
 
         target_txt = self.target_user.value if self.target_user else "لا يوجد"
         reason_txt = self.reason.value
@@ -86,7 +109,7 @@ class TicketModal(discord.ui.Modal):
             color=0x9B59B6
         )
         embed.description = (
-            f"🆔 **رقم التكت:** {ticket_channel.id}\n"
+            f"🆔 **رقم التكت:** `{ticket_number:04d}`\n"
             f"—\n"
             f"📂 **نوع التكت:** {self.ticket_type}\n"
             f"—\n"
@@ -123,25 +146,25 @@ class TicketSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v1", emoji="❓")
+    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v2", emoji="❓")
     async def query_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("إستفسار"))
 
-    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v1", emoji="⚠️")
+    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v2", emoji="⚠️")
     async def member_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على عضو"))
 
-    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v1", emoji="🛡️")
+    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v2", emoji="🛡️")
     async def admin_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على إداري"))
 
-    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v1", emoji="🛠️")
+    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v2", emoji="🛠️")
     async def support_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("دعم فني"))
 
 class CloseReasonModal(discord.ui.Modal, title="سبب إغلاق التكت"):
     reason_input = discord.ui.TextInput(
-        label="هل تم حل المشكلة؟ (اكتب السبب أو التفاصيل)",
+        label="هل تم حل المشكلة؟ (اكتب السبب)",
         style=discord.TextStyle.paragraph,
         placeholder="اكتب هنا...",
         required=True,
@@ -159,7 +182,6 @@ class CloseReasonModal(discord.ui.Modal, title="سبب إغلاق التكت"):
 
         await interaction.followup.send("🔒 جاري إغلاق التكت وإرسال النسخة الاحتياطية...", ephemeral=True)
 
-        # إرسال النسخة الاحتياطية
         opener_id = data.get("opener")
         opener_user = interaction.guild.get_member(opener_id) or await interaction.client.fetch_user(opener_id)
         log_channel = interaction.guild.get_channel(LOG_CHANNEL_ID)
@@ -171,17 +193,15 @@ class CloseReasonModal(discord.ui.Modal, title="سبب إغلاق التكت"):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(log_text)
 
-        file = discord.File(file_path)
         if opener_user:
             try:
-                await opener_user.send(f"📁 هذه نسختك الاحتياطية للتكت المغلق في سيرفر {interaction.guild.name}:", file=file)
+                await opener_user.send(f"📁 هذه نسختك الاحتياطية للتكت المغلق في سيرفر {interaction.guild.name}:", file=discord.File(file_path))
             except:
                 pass
         
         if log_channel:
             await log_channel.send(f"📁 أرشيف التكت المغلق `{channel.name}`:", file=discord.File(file_path))
 
-        # إرسال زر تقييم الإداري لصاحب التكت
         if opener_user:
             try:
                 await opener_user.send("⭐ نرجو تقييم تجربتك مع الإداري الذي خدمك في التكت:", view=RatingView())
@@ -194,17 +214,17 @@ class RatingView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1")
+    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1_v2")
     async def r1(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "1 نجمة")
-    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2")
+    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2_v2")
     async def r2(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "2 نجوم")
-    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3")
+    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3_v2")
     async def r3(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "3 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4")
+    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4_v2")
     async def r4(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "4 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5_v2")
     async def r5(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "5 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6_v2")
     async def r6(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "6 نجوم (ممتاز جداً)")
 
     async def rate_cb(self, interaction: discord.Interaction, rating: str):
@@ -273,7 +293,7 @@ class TicketControlView(discord.ui.View):
         role = interaction.guild.get_role(ADMIN_ROLE_ID)
         return (role in interaction.user.roles) or (interaction.user.id == OWNER_ID) or interaction.user.guild_permissions.administrator
 
-    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v1", emoji="🙋‍♂️")
+    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v2", emoji="🙋‍♂️")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.is_admin(interaction):
             await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
@@ -288,28 +308,27 @@ class TicketControlView(discord.ui.View):
         data["claimed_by"] = interaction.user.mention
         data["claimed_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # منح صلاحية الكتابة للعضو المستلم ولإعطاء الإذن
         admin_role = interaction.guild.get_role(ADMIN_ROLE_ID)
         if admin_role:
             await channel.set_permissions(admin_role, send_messages=True)
 
         await interaction.response.send_message(f"✅ قام الإداري {interaction.user.mention} باستلام التكت بنجاح!", ephemeral=False)
 
-    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v1", emoji="🔒")
+    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v2", emoji="🔒")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.is_admin(interaction):
             await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
             return
         await interaction.response.send_modal(CloseReasonModal())
 
-    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v1", emoji="🚨")
+    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v2", emoji="🚨")
     async def call_admin(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.is_admin(interaction):
             await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
             return
         await interaction.response.send_message(f"🚨 تم استدعاء الإدارة العامة بنجاح بواسطة {interaction.user.mention} <@&{ADMIN_ROLE_ID}>", ephemeral=False)
 
-    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v1", emoji="⚙️")
+    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v2", emoji="⚙️")
     async def other_options(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.is_admin(interaction):
             await interaction.response.send_message("❌ مانت إداري يا عيون بابا!", ephemeral=True)
