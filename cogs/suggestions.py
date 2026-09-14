@@ -8,12 +8,12 @@ DATA_FILE = "suggestions_data.json"
 
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {"streak": 0, "suggestions": []}
+        return {"suggestions": []}
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
-        return {"streak": 0, "suggestions": []}
+        return {"suggestions": []}
 
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -37,21 +37,21 @@ class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتط�
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True, ephemeral=True)
         
-        data = load_data()
-        data["streak"] = min(20, data.get("streak", 0) + 1)
-        
-        # حفظ بيانات الفكرة أو إرسالها للقناة
+        # إنشاء اليمبد مع منشن العضو والصورة المطلوبة وبدون ستريك
         embed = discord.Embed(
-            title=f"💡 اقتراح جديد من {interaction.user.name}",
-            description=self.suggestion_input.value,
-            color=self.color_hex
+            title="💡 • اقتراح جديد",
+            description=f"**صاحب الاقتراح:** {interaction.user.mention}\n**الفكرة:**\n{self.suggestion_input.value}",
+        color=self.color_hex
         )
-        embed.set_footer(text=f"التصنيف: {self.color_name} | Streak: {data['streak']}")
+        embed.add_field(name="👍 المؤيدون (0)", value="لا يوجد حالياً", inline=False)
+        embed.add_field(name="👎 المعارضون (0)", value="لا يوجد حالياً", inline=False)
+        embed.set_footer(text=f"التصنيف: {self.color_name}")
+        embed.set_image(url="https://b.top4top.io/p_3909j0hu80.png")
         
-        # إرسال الاقتراح في نفس القناة أو قناة مخصصة
+        # إرسال الاقتراح للقناة مع أزرار التفاعل
         await interaction.channel.send(embed=embed, view=SuggestionActionView())
-        save_data(data)
         
+        # إرسال رسالة تأكيد مؤقتة ثم حذفها أو إخفاؤها
         await interaction.followup.send("✅ تم إرسال فكرتك بنجاح!", ephemeral=True)
 
 # قائمة اختيار الألوان الـ 13
@@ -90,31 +90,89 @@ class ColorSelectView(discord.ui.View):
         }
         selected_label = select.values[0]
         color_hex = colors_map.get(selected_label, 0x3498DB)
+        
+        # فتح المودال وحذف رسالة اختيار اللون فوراً لتبقى الشاشة نظيفة
         await interaction.response.send_modal(SuggestionModal(color_name=selected_label, color_hex=color_hex))
 
-# اللوحة الرئيسية (زر شارك فكرتك يفتح الألوان مباشرة)
+# اللوحة الرئيسية
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="شارك فكرتك", style=discord.ButtonStyle.primary, custom_id="main_share_idea_btn", emoji="💡")
     async def share_idea_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # يفتح قائمة الألوان المنسدلة مباشرة
         view = ColorSelectView()
-        await interaction.response.send_message("اختر تصنيف لون فكرتك من القناة أدناه:", view=view, ephemeral=True)
+        await interaction.response.send_message("اختر تصنيف لون فكرتك من القائمة أدناه:", view=view, ephemeral=True)
 
-# أزرار التفاعل على الاقتراح نفسه (تصويت وغيرها)
+# أزرار التفاعل (تأييد / معارضة) مع تحديث القوائم والمنشنات
 class SuggestionActionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="👍 تأييد", style=discord.ButtonStyle.success, custom_id="sug_upvote_btn")
     async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ تم تسجيل صوتك بنجاح!", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        message = interaction.message
+        embed = message.embeds[0]
+        
+        # تحديث حقل المؤيدين
+        upvote_field_index = 0
+        current_field = embed.fields[upvote_field_index]
+        current_value = current_field.value
+        
+        user_mention = interaction.user.mention
+        
+        if "لا يوجد حالياً" in current_value:
+            supporters = [user_mention]
+        else:
+            supporters = current_value.split("\n")
+            if user_mention not in supporters:
+                supporters.append(user_mention)
+            else:
+                supporters.remove(user_mention) # إلغاء التأييد لو ضغط مرة ثانية
+                
+        new_value = "\n".join(supporters) if supporters else "لا يوجد حالياً"
+        embed.set_field_at(
+            index=upvote_field_index,
+            name=f"👍 المؤيدون ({len(supporters) if supporters and supporters[0] != 'لا يوجد حالياً' else 0})",
+            value=new_value,
+            inline=False
+        )
+        
+        await message.edit(embed=embed)
+        await interaction.followup.send("✅ تم تحديث تصويتك بنجاح!", ephemeral=True)
 
     @discord.ui.button(label="👎 معارضة", style=discord.ButtonStyle.danger, custom_id="sug_downvote_btn")
     async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("❌ تم تسجيل صوتك بنجاح!", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        message = interaction.message
+        embed = message.embeds[0]
+        
+        downvote_field_index = 1
+        current_field = embed.fields[downvote_field_index]
+        current_value = current_field.value
+        
+        user_mention = interaction.user.mention
+        
+        if "لا يوجد حالياً" in current_value:
+            opposers = [user_mention]
+        else:
+            opposers = current_value.split("\n")
+            if user_mention not in opposers:
+                opposers.append(user_mention)
+            else:
+                opposers.remove(user_mention)
+                
+        new_value = "\n".join(opposers) if opposers else "لا يوجد حالياً"
+        embed.set_field_at(
+            index=downvote_field_index,
+            name=f"👎 المعارضون ({len(opposers) if opposers and opposers[0] != 'لا يوجد حالياً' else 0})",
+            value=new_value,
+            inline=False
+        )
+        
+        await message.edit(embed=embed)
+        await interaction.followup.send("❌ تم تحديث تصويتك بنجاح!", ephemeral=True)
 
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot):
@@ -122,7 +180,6 @@ class SuggestionsCog(commands.Cog):
 
     @app_commands.command(name="setup_suggestions", description="إرسال لوحة نظام الاقتراحات")
     async def setup_suggestions(self, interaction: discord.Interaction):
-        # استجابة فورية لمنع خطأ الـ Timeout
         await interaction.response.send_message("✅ جاري إرسال لوحة الاقتراحات...", ephemeral=True)
         
         embed = discord.Embed(
@@ -130,7 +187,7 @@ class SuggestionsCog(commands.Cog):
             description="نحن نرحب بكافة آرائك واقتراحاتك البناءة لتطوير السيرفر وجعله أفضل دائماً.\nاضغط على الزر أدناه للبدء في كتابة فكرتك واختيار لونها الخاص!",
             color=0x9B59B6
         )
-        embed.set_image(url="https://cdn.phototourl.com/free/2026-09-12-34690126-831d-4c61-a227-cb0a9dde78bf.png")
+        embed.set_image(url="https://b.top4top.io/p_3909j0hu80.png")
         
         view = MainPanelView()
         await interaction.channel.send(embed=embed, view=view)
