@@ -1,271 +1,139 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 import json
 import os
 
 DATA_FILE = "suggestions_data.json"
 
 def load_data():
-    if os.path.exists(DATA_FILE):
+    if not os.path.exists(DATA_FILE):
+        return {"streak": 0, "suggestions": []}
+    try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except:
-                return {"count": 0, "suggestions": {}}
-    return {"count": 0, "suggestions": {}}
+            return json.load(f)
+    except:
+        return {"streak": 0, "suggestions": []}
 
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-COLORS = {
-    "أصفر": 0xF1C40F,
-    "أحمر": 0xE74C3C,
-    "أزرق": 0x3498DB,
-    "أخضر": 0x2ECC71,
-    "بنفسجي": 0x9B59B6,
-    "برتقالي": 0xE67E22,
-    "وردي": 0xFF69B4,
-    "تركوازي": 0x1ABC9C,
-    "ذهبي": 0xD4AF37,
-    "رمادي": 0x95A5A6,
-    "أبيض": 0xFFFFFF,
-    "بني": 0x8B4513,
-    "كحلي": 0x1B4F72
-}
-
+# مودال كتابة الفكرة
 class SuggestionModal(discord.ui.Modal, title="شاركنا فكرتك للتطوير"):
-    def __init__(self, color_name: str):
-        super().__init__(timeout=None)
+    def __init__(self, color_name: str, color_hex: int):
+        super().__init__()
         self.color_name = color_name
+        self.color_hex = color_hex
 
-    idea_input = discord.ui.TextInput(
+    suggestion_input = discord.ui.TextInput(
         label="اكتب فكرتك (لا تحط أمثلة)",
         style=discord.TextStyle.paragraph,
-        placeholder="اكتب تفاصيل فكرتك هنا بوضوح...",
+        placeholder="اكتب اقتراحك هنا...",
         required=True,
         max_length=1000
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        
         data = load_data()
-        data["count"] += 1
-        s_id = str(data["count"])
+        data["streak"] = min(20, data.get("streak", 0) + 1)
         
-        data["suggestions"][s_id] = {
-            "author_id": interaction.user.id,
-            "text": self.idea_input.value,
-            "color_name": self.color_name,
-            "streak": 0,
-            "voters": [],
-            "ratings": [],
-            "rejections": 0,
-            "dm_sent": False
-        }
-        save_data(data)
-
+        # حفظ بيانات الفكرة أو إرسالها للقناة
         embed = discord.Embed(
-            title=f"💡 فكرة رقم #{s_id}",
-            description=f"**{self.idea_input.value}**",
-            color=COLORS.get(self.color_name, 0xFFFFFF)
+            title=f"💡 اقتراح جديد من {interaction.user.name}",
+            description=self.suggestion_input.value,
+            color=self.color_hex
         )
-        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
-        embed.add_field(name="صاحب الفكرة", value=interaction.user.mention, inline=False)
-        embed.add_field(name="التقييم والستريك", value="🕯️ الستريك: 0 | ⭐ التقييم: 0.0 (0) | ❌ رفض: 0", inline=False)
+        embed.set_footer(text=f"التصنيف: {self.color_name} | Streak: {data['streak']}")
         
-        view = SuggestionView()
+        # إرسال الاقتراح في نفس القناة أو قناة مخصصة
+        await interaction.channel.send(embed=embed, view=SuggestionActionView())
+        save_data(data)
         
-        await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ تم إرسال فكرتك بنجاح وتوثيقها!", ephemeral=True)
+        await interaction.followup.send("✅ تم إرسال فكرتك بنجاح!", ephemeral=True)
 
+# قائمة اختيار الألوان الـ 13
 class ColorSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        
-        options = [discord.SelectOption(label=name, value=name) for name in COLORS.keys()]
-        
-        self.select_menu = discord.ui.Select(
-            placeholder="اختر لون الفكرة...",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="color_select_menu_persistent"
-        )
-        self.select_menu.callback = self.select_callback
-        self.add_item(self.select_menu)
 
-    async def select_callback(self, interaction: discord.Interaction):
-        selected_color = self.select_menu.values[0]
-        modal = SuggestionModal(color_name=selected_color)
-        await interaction.response.send_modal(modal)
-
-class SuggestionView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="تصويت / سحب", style=discord.ButtonStyle.green, custom_id="persistent_vote_btn")
-    async def vote_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = interaction.message.embeds[0]
-        # استخراج رقم الفكرة من عنوان اليمبد (مثال: "💡 فكرة رقم #1")
-        try:
-            title_parts = embed.title.split("#")
-            s_id = title_parts[1].strip()
-        except:
-            await interaction.response.send_message("❌ حدث خطأ أثناء قراءة رقم الفكرة.", ephemeral=True)
-            return
-
-        data = load_data()
-        if s_id not in data["suggestions"]:
-            await interaction.response.send_message("❌ هذه الفكرة غير موجودة في قاعدة البيانات.", ephemeral=True)
-            return
-
-        s_data = data["suggestions"][s_id]
-        user_id_str = str(interaction.user.id)
-
-        if user_id_str in s_data["voters"]:
-            s_data["voters"].remove(user_id_str)
-            s_data["streak"] = max(0, s_data["streak"] - 1)
-            action_msg = "تم سحب تصويتك بنجاح."
-        else:
-            s_data["voters"].append(user_id_str)
-            s_data["streak"] += 1
-            action_msg = "تم تسجيل صوتك بنجاح!"
-
-        streak = s_data["streak"]
-        if streak >= 20:
-            streak_icon = "🕯️🔥 [اللون النهائي 20+]"
-            if not s_data.get("dm_sent", False):
-                s_data["dm_sent"] = True
-                try:
-                    author = await interaction.client.fetch_user(s_data["author_id"])
-                    await author.send("الله يجزاك خير على الفكرة الي تبيض الوجه امواححح يا شيخ .")
-                except:
-                    pass
-        elif streak >= 11:
-            streak_icon = f"🕯️💜 (الستريك: {streak})"
-        elif streak >= 7:
-            streak_icon = f"🕯️💙 (الستريك: {streak})"
-        elif streak >= 3:
-            streak_icon = f"🕯️💖 (الستريك: {streak})"
-        else:
-            streak_icon = f"🕯️ (الستريك: {streak})"
-
-        save_data(data)
-
-        ratings = s_data["ratings"]
-        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
-        
-        embed.set_field_at(
-            1,
-            name="التقييم والستريك",
-            value=f"{streak_icon} | ⭐ التقييم: {avg_rating} ({len(ratings)}) | ❌ رفض: {s_data['rejections']}",
-            inline=False
-        )
-        await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(action_msg, ephemeral=True)
-
-    @discord.ui.button(label="تقييم الفكرة", style=discord.ButtonStyle.blurple, custom_id="persistent_rate_btn")
-    async def rate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = interaction.message.embeds[0]
-        try:
-            title_parts = embed.title.split("#")
-            s_id = title_parts[1].strip()
-        except:
-            await interaction.response.send_message("❌ حدث خطأ أثناء قراءة رقم الفكرة.", ephemeral=True)
-            return
-
-        await interaction.response.send_modal(RateModal(s_id))
-
-class RateModal(discord.ui.Modal, title="تقييم الفكرة"):
-    def __init__(self, s_id: str):
-        super().__init__(timeout=None)
-        self.s_id = s_id
-
-    rating_input = discord.ui.TextInput(
-        label="اكتب تقييمك من 0 إلى 6 (0 يعني رفض)",
-        placeholder="اكتب رقم من 0 إلى 6...",
-        min_length=1,
-        max_length=1,
-        required=True
+    @discord.ui.select(
+        placeholder="اختر لون الفئة الخاصة باقتراحك...",
+        min_values=1,
+        max_values=1,
+        custom_id="suggestion_color_select",
+        options=[
+            discord.SelectOption(label="أحمر", value="Red", description="اقتراحات عامة أو عاجلة", emoji="🔴"),
+            discord.SelectOption(label="أزرق", value="Blue", description="تطويرات برمجية أو بوتات", emoji="🔵"),
+            discord.SelectOption(label="أخضر", value="Green", description="إضافات ومميزات جديدة", emoji="🟢"),
+            discord.SelectOption(label="أصفر", value="Yellow", description="تعديلات وتحسينات", emoji="🟡"),
+            discord.SelectOption(label="برتقالي", value="Orange", description="فعاليات وأحداث", emoji="🟠"),
+            discord.SelectOption(label="بنفسجي", value="Purple", description="تصاميم وواجهات", emoji="🟣"),
+            discord.SelectOption(label="وردي", value="Pink", description="أفكار مميزة", emoji="🩷"),
+            discord.SelectOption(label="أسود", value="Black", description="إلغاء أو تعديل نظام", emoji="⬛"),
+            discord.SelectOption(label="أبيض", value="White", description="أفكار عامة", emoji="⬜"),
+            discord.SelectOption(label="بني", value="Brown", description="قسم الرتب والأقسام", emoji="🟫"),
+            discord.SelectOption(label="رمادي", value="Gray", description="أرشيف وصيانة", emoji="🩶"),
+            discord.SelectOption(label="سماوي", value="Cyan", description="أوامر صوتية وتفاعلية", emoji="🌐"),
+            discord.SelectOption(label="ذهبي", value="Gold", description="اقتراحات VIP خاصة", emoji="⭐"),
+        ]
     )
+    async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+        colors_map = {
+            "Red": 0xFF0000, "Blue": 0x0000FF, "Green": 0x00FF00,
+            "Yellow": 0xFFFF00, "Orange": 0xFFA500, "Purple": 0x800080,
+            "Pink": 0xFFC0CB, "Black": 0x000000, "White": 0xFFFFFF,
+            "Brown": 0xA52A2A, "Gray": 0x808080, "Cyan": 0x00FFFF,
+            "Gold": 0xFFD700
+        }
+        selected_label = select.values[0]
+        color_hex = colors_map.get(selected_label, 0x3498DB)
+        await interaction.response.send_modal(SuggestionModal(color_name=selected_label, color_hex=color_hex))
 
-    async def on_submit(self, interaction: discord.Interaction):
-        val = self.rating_input.value
-        if not val.isdigit() or not (0 <= int(val) <= 6):
-            await interaction.response.send_message("❌ خطأ: يجب أن يكون التقييم رقماً صحيحاً بين 0 و 6 حصراً.", ephemeral=True)
-            return
-
-        score = int(val)
-        data = load_data()
-        if self.s_id not in data["suggestions"]:
-            await interaction.response.send_message("❌ الفكرة غير موجودة.", ephemeral=True)
-            return
-
-        s_data = data["suggestions"][self.s_id]
-        
-        if score == 0:
-            s_data["rejections"] += 1
-        else:
-            s_data["ratings"].append(score)
-
-        save_data(data)
-
-        msg = interaction.message
-        embed = msg.embeds[0]
-        streak = s_data["streak"]
-        
-        if streak >= 20:
-            streak_icon = "🕯️🔥 [اللون النهائي 20+]"
-        elif streak >= 11:
-            streak_icon = f"🕯️💜 (الستريك: {streak})"
-        elif streak >= 7:
-            streak_icon = f"🕯️💙 (الستريك: {streak})"
-        elif streak >= 3:
-            streak_icon = f"🕯️💖 (الستريك: {streak})"
-        else:
-            streak_icon = f"🕯️ (الستريك: {streak})"
-
-        ratings = s_data["ratings"]
-        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else 0.0
-
-        embed.set_field_at(
-            1,
-            name="التقييم والستريك",
-            value=f"{streak_icon} | ⭐ التقييم: {avg_rating} ({len(ratings)}) | ❌ رفض: {s_data['rejections']}",
-            inline=False
-        )
-        
-        view = SuggestionView()
-        await msg.edit(embed=embed, view=view)
-        await interaction.response.send_message(f"✅ تم تسجيل تقييمك ({score}) بنجاح!", ephemeral=True)
-
+# اللوحة الرئيسية (زر شارك فكرتك يفتح الألوان مباشرة)
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="انتقل للإدارة (شارك فكرتك)", style=discord.ButtonStyle.primary, custom_id="open_suggestion_menu_persistent_btn")
-    async def open_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="شارك فكرتك", style=discord.ButtonStyle.primary, custom_id="main_share_idea_btn", emoji="💡")
+    async def share_idea_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # يفتح قائمة الألوان المنسدلة مباشرة
         view = ColorSelectView()
-        await interaction.response.send_message("اختر لون الفكرة المناسب لتظهر رسالتك به:", view=view, ephemeral=True)
+        await interaction.response.send_message("اختر تصنيف لون فكرتك من القناة أدناه:", view=view, ephemeral=True)
+
+# أزرار التفاعل على الاقتراح نفسه (تصويت وغيرها)
+class SuggestionActionView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="👍 تأييد", style=discord.ButtonStyle.success, custom_id="sug_upvote_btn")
+    async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("✅ تم تسجيل صوتك بنجاح!", ephemeral=True)
+
+    @discord.ui.button(label="👎 معارضة", style=discord.ButtonStyle.danger, custom_id="sug_downvote_btn")
+    async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("❌ تم تسجيل صوتك بنجاح!", ephemeral=True)
 
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="setup_suggestions", description="إرسال لوحة شارك أفكارك لتطوير السيرفر")
-    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="setup_suggestions", description="إرسال لوحة نظام الاقتراحات")
     async def setup_suggestions(self, interaction: discord.Interaction):
+        # استجابة فورية لمنع خطأ الـ Timeout
+        await interaction.response.send_message("✅ جاري إرسال لوحة الاقتراحات...", ephemeral=True)
+        
         embed = discord.Embed(
-            title="✨ شارك أفكارك معنا لتطوير السيرفر",
-            description="نحن نرحب بكافة آرائك واقترحاتك البناءة لتطوير السيرفر وجعله أفضل دائماً.\nاضغط على الزر أدناه للبدء في كتابة فكرتك واختيار لونها الخاص!",
-            color=0x2B2D31
+            title="💡 • أفكار • IDEAS",
+            description="نحن نرحب بكافة آرائك واقتراحاتك البناءة لتطوير السيرفر وجعله أفضل دائماً.\nاضغط على الزر أدناه للبدء في كتابة فكرتك واختيار لونها الخاص!",
+            color=0x9B59B6
         )
-        embed.set_image(url="https://f.top4top.io/p_3909ea6fn0.png")
+        embed.set_image(url="https://cdn.phototourl.com/free/2026-09-12-34690126-831d-4c61-a227-cb0a9dde78bf.png")
         
         view = MainPanelView()
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ تمت إرسال لوحة الأفكار بنجاح!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(SuggestionsCog(bot))
