@@ -75,6 +75,7 @@ class TicketModal(discord.ui.Modal):
         category = guild.get_channel(TICKET_CATEGORY_ID)
         admin_role = guild.get_role(ADMIN_ROLE_ID)
 
+        # إعطاء الصلاحيات: العضو صاحب التكت + الإدارة فقط يرون التكت ويكتبون فيه
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
@@ -147,26 +148,31 @@ class TicketModal(discord.ui.Modal):
             embed.add_field(name="🎯 المشكو في حقه", value=target_txt, inline=False)
             embed.add_footer(text="أرسل الدليل (صور/روابط) داخل التكت الآن.")
 
-        await ticket_channel.send(content=f"{interaction.user.mention}", embed=embed, view=TicketControlView())
+        # إرسال اللوحة مع الأزرار الأربعة المطلوبة داخل التكت تلقائياً
+        ping_content = f"{interaction.user.mention}"
+        if admin_role:
+            ping_content += f" <@&{ADMIN_ROLE_ID}>"
+
+        await ticket_channel.send(content=ping_content, embed=embed, view=TicketControlView())
         await interaction.followup.send(f"✅ تم فتح تكت الخاص بك بنجاح: {ticket_channel.mention}", ephemeral=True)
 
 class TicketSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v4", emoji="❓")
+    @discord.ui.button(label="إستفسار", style=discord.ButtonStyle.primary, custom_id="ticket_query_v5", emoji="❓")
     async def query_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("إستفسار"))
 
-    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v4", emoji="⚠️")
+    @discord.ui.button(label="شكوى على عضو", style=discord.ButtonStyle.danger, custom_id="ticket_member_comp_v5", emoji="⚠️")
     async def member_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على عضو"))
 
-    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v4", emoji="🛡️")
+    @discord.ui.button(label="شكوى على إداري", style=discord.ButtonStyle.danger, custom_id="ticket_admin_comp_v5", emoji="🛡️")
     async def admin_comp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("شكوى على إداري"))
 
-    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v4", emoji="🛠️")
+    @discord.ui.button(label="دعم فني", style=discord.ButtonStyle.success, custom_id="ticket_support_v5", emoji="🛠️")
     async def support_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal("دعم فني"))
 
@@ -222,17 +228,17 @@ class RatingView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1_v4")
+    @discord.ui.button(label="⭐ 1", style=discord.ButtonStyle.secondary, custom_id="rate_1_v5")
     async def r1(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "1 نجمة")
-    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2_v4")
+    @discord.ui.button(label="⭐⭐ 2", style=discord.ButtonStyle.secondary, custom_id="rate_2_v5")
     async def r2(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "2 نجوم")
-    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3_v4")
+    @discord.ui.button(label="⭐⭐⭐ 3", style=discord.ButtonStyle.secondary, custom_id="rate_3_v5")
     async def r3(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "3 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4_v4")
+    @discord.ui.button(label="⭐⭐⭐⭐ 4", style=discord.ButtonStyle.primary, custom_id="rate_4_v5")
     async def r4(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "4 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5_v4")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐ 5", style=discord.ButtonStyle.success, custom_id="rate_5_v5")
     async def r5(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "5 نجوم")
-    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6_v4")
+    @discord.ui.button(label="⭐⭐⭐⭐⭐⭐ 6", style=discord.ButtonStyle.success, custom_id="rate_6_v5")
     async def r6(self, interaction: discord.Interaction, b): await self.rate_cb(interaction, "6 نجوم (ممتاز جداً)")
 
     async def rate_cb(self, interaction: discord.Interaction, rating: str):
@@ -303,7 +309,7 @@ class TicketControlView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v4", emoji="🙋‍♂️")
+    @discord.ui.button(label="استلام التكت", style=discord.ButtonStyle.success, custom_id="claim_ticket_v5", emoji="🙋‍♂️")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not check_admin_permission(interaction):
             await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
@@ -324,19 +330,18 @@ class TicketControlView(discord.ui.View):
 
         await interaction.response.send_message(f"✅ قام {interaction.user.mention} باستلام التكت بنجاح!", ephemeral=False)
 
-    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v4", emoji="🔒")
+    @discord.ui.button(label="إغلاق التكت", style=discord.ButtonStyle.danger, custom_id="close_ticket_v5", emoji="🔒")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not check_admin_permission(interaction):
             await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
             return
         await interaction.response.send_modal(CloseReasonModal())
 
-    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v4", emoji="🚨")
+    @discord.ui.button(label="استدعاء الإدارة", style=discord.ButtonStyle.secondary, custom_id="call_admin_v5", emoji="🚨")
     async def call_admin(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel_id = interaction.channel.id
         user_id = interaction.user.id
         
-        # تتبع عدد مرات استخدام الزر (3 مرات فقط لكل مستخدم في التكت الواحد)
         key = (channel_id, user_id)
         count = call_admin_counts.get(key, 0)
         
@@ -349,7 +354,7 @@ class TicketControlView(discord.ui.View):
         
         await interaction.response.send_message(f"🚨 تم استدعاء الإدارة العامة بنجاح بواسطة {interaction.user.mention} <@&{ADMIN_ROLE_ID}>\n*(المحاولات المتبقية لك: {remaining})*", ephemeral=False)
 
-    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v4", emoji="⚙️")
+    @discord.ui.button(label="خيارات اخرى", style=discord.ButtonStyle.blurple, custom_id="other_options_v5", emoji="⚙️")
     async def other_options(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not check_admin_permission(interaction):
             await interaction.response.send_message("❌ هذا الأمر خاص بإدارة السيرفر!", ephemeral=True)
