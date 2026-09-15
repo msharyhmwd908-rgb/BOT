@@ -8,14 +8,16 @@ from datetime import datetime
 # CONFIG
 # =========================
 
+CREATOR_ID = 1495450684731162664
+
 CATEGORY_ID = 1548014683695620116
 PANEL_CHANNEL_ID = 1548014911932858398
 LOG_CHANNEL_ID = 1495450684731162664
 
 STAFF_ROLES = [
-    1498008105819177240,  # Admin
-    1497718287956443249,  # Owner
-    1497608751551746179   # Co-Owner
+    1498008105819177240,
+    1497718287956443249,
+    1497608751551746179
 ]
 
 COLOR = discord.Color.from_rgb(100, 0, 20)
@@ -25,6 +27,7 @@ COLOR = discord.Color.from_rgb(100, 0, 20)
 # =========================
 
 db = sqlite3.connect("tickets.db", check_same_thread=False)
+
 db.execute("""
 CREATE TABLE IF NOT EXISTS tickets (
     channel_id INTEGER PRIMARY KEY,
@@ -40,6 +43,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     close_reason TEXT DEFAULT ''
 )
 """)
+
 db.commit()
 
 
@@ -62,6 +66,7 @@ def next_number():
     x = db.execute(
         "SELECT MAX(number) FROM tickets"
     ).fetchone()[0]
+
     return (x or 0) + 1
 
 
@@ -129,9 +134,10 @@ async def create_ticket(interaction, ticket_type, reason):
             ephemeral=True
         )
 
-    # منع تكتين لنفس الشخص
     for ch in category.channels:
+
         t = get_ticket(ch.id)
+
         if t and t[4] == interaction.user.id and not t[8]:
             return await interaction.response.send_message(
                 f"❌ عندك تكت مفتوح بالفعل: {ch.mention}",
@@ -150,6 +156,7 @@ async def create_ticket(interaction, ticket_type, reason):
         guild.default_role: discord.PermissionOverwrite(
             view_channel=False
         ),
+
         interaction.user: discord.PermissionOverwrite(
             view_channel=True,
             send_messages=True,
@@ -159,8 +166,11 @@ async def create_ticket(interaction, ticket_type, reason):
     }
 
     for rid in STAFF_ROLES:
+
         role = guild.get_role(rid)
+
         if role:
+
             overwrites[role] = discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
@@ -187,6 +197,7 @@ async def create_ticket(interaction, ticket_type, reason):
         interaction.user.id,
         time_now()
     ))
+
     db.commit()
 
     await interaction.response.send_message(
@@ -201,6 +212,7 @@ async def create_ticket(interaction, ticket_type, reason):
     ]
 
     if roles:
+
         await channel.send(
             "📢 **تكت جديد يحتاج إلى الدعم**\n" +
             " ".join(roles),
@@ -228,6 +240,7 @@ class SupportModal(discord.ui.Modal, title="🛠️ دعم فني"):
     )
 
     async def on_submit(self, interaction):
+
         await create_ticket(
             interaction,
             "دعم فني",
@@ -244,6 +257,7 @@ class InquiryModal(discord.ui.Modal, title="❓ استفسار"):
     )
 
     async def on_submit(self, interaction):
+
         await create_ticket(
             interaction,
             "استفسار",
@@ -289,15 +303,17 @@ class CloseModal(discord.ui.Modal, title="🔒 إغلاق التكت"):
 
     async def on_submit(self, interaction):
 
-        if not staff(interaction.user):
+        if not staff(interaction.user) and interaction.user.id != CREATOR_ID:
+
             return await interaction.response.send_message(
-                "❌ مانت أدمن، روح نام 😴",
+                "❌ هذا الإجراء للإدارة فقط.",
                 ephemeral=True
             )
 
         t = get_ticket(interaction.channel.id)
 
         if not t or t[8]:
+
             return await interaction.response.send_message(
                 "❌ التكت مغلق بالفعل.",
                 ephemeral=True
@@ -313,6 +329,7 @@ class CloseModal(discord.ui.Modal, title="🔒 إغلاق التكت"):
             self.reason.value,
             interaction.channel.id
         ))
+
         db.commit()
 
         await interaction.response.send_message(
@@ -330,60 +347,75 @@ class CloseModal(discord.ui.Modal, title="🔒 إغلاق التكت"):
 class MemberModal(discord.ui.Modal):
 
     def __init__(self, remove=False):
+
         self.remove = remove
+
         super().__init__(
             title="➖ إزالة عضو" if remove else "➕ إضافة عضو"
         )
 
         self.user = discord.ui.TextInput(
-            label="ID أو Username",
+            label="ID العضو",
             max_length=100
         )
+
         self.add_item(self.user)
 
     async def on_submit(self, interaction):
 
-        if not staff(interaction.user):
+        if not staff(interaction.user) and interaction.user.id != CREATOR_ID:
+
             return await interaction.response.send_message(
-                "❌ مانت أدمن، روح نام 😴",
+                "❌ هذا الإجراء للإدارة فقط.",
                 ephemeral=True
             )
 
-        member = interaction.guild.get_member(
-            int(self.user.value)
-        ) if self.user.value.isdigit() else None
+        member = None
+
+        if self.user.value.isdigit():
+
+            member = interaction.guild.get_member(
+                int(self.user.value)
+            )
 
         if not member:
+
             return await interaction.response.send_message(
                 "❌ ما لقيت العضو.",
                 ephemeral=True
             )
 
         if self.remove:
+
             await interaction.channel.set_permissions(
                 member,
                 overwrite=None
             )
+
             msg = f"✅ تمت إزالة {member.mention}."
+
         else:
+
             await interaction.channel.set_permissions(
                 member,
                 view_channel=True,
                 send_messages=True,
                 read_message_history=True
             )
+
             msg = f"✅ تمت إضافة {member.mention}."
 
         await interaction.response.send_message(msg)
 
 
 # =========================
-# TICKET BUTTONS
+# TICKET CONTROLS
 # =========================
 
 class TicketControls(discord.ui.View):
 
     def __init__(self):
+
         super().__init__(timeout=None)
 
     @discord.ui.button(
@@ -394,21 +426,24 @@ class TicketControls(discord.ui.View):
     )
     async def claim(self, interaction, button):
 
-        if not staff(interaction.user):
+        if not staff(interaction.user) and interaction.user.id != CREATOR_ID:
+
             return await interaction.response.send_message(
-                "❌ مانت أدمن، روح نام 😴",
+                "❌ هذا الإجراء للإدارة فقط.",
                 ephemeral=True
             )
 
         t = get_ticket(interaction.channel.id)
 
         if not t:
+
             return await interaction.response.send_message(
                 "❌ هذا ليس تكت.",
                 ephemeral=True
             )
 
         if t[6]:
+
             return await interaction.response.send_message(
                 "❌ هذا التكت مستلم بالفعل.",
                 ephemeral=True
@@ -423,6 +458,7 @@ class TicketControls(discord.ui.View):
             time_now(),
             interaction.channel.id
         ))
+
         db.commit()
 
         await interaction.response.edit_message(
@@ -464,7 +500,8 @@ class TicketControls(discord.ui.View):
         ]
 
         await interaction.response.send_message(
-            "📢 **تم تنبيه الإدارة**\n" + " ".join(roles),
+            "📢 **تم تنبيه الإدارة**\n" +
+            " ".join(roles),
             allowed_mentions=discord.AllowedMentions(roles=True)
         )
 
@@ -500,6 +537,7 @@ class TicketControls(discord.ui.View):
 class TicketPanel(discord.ui.View):
 
     def __init__(self):
+
         super().__init__(timeout=None)
 
     @discord.ui.button(
@@ -509,6 +547,7 @@ class TicketPanel(discord.ui.View):
         custom_id="n9v_support"
     )
     async def support(self, interaction, button):
+
         await interaction.response.send_modal(
             SupportModal()
         )
@@ -520,6 +559,7 @@ class TicketPanel(discord.ui.View):
         custom_id="n9v_inquiry"
     )
     async def inquiry(self, interaction, button):
+
         await interaction.response.send_modal(
             InquiryModal()
         )
@@ -531,6 +571,7 @@ class TicketPanel(discord.ui.View):
         custom_id="n9v_complaint"
     )
     async def complaint(self, interaction, button):
+
         await interaction.response.send_modal(
             ComplaintModal()
         )
@@ -553,9 +594,11 @@ async def send_transcript(guild, channel):
         limit=None,
         oldest_first=True
     ):
+
         content = msg.content or "[بدون نص]"
 
         if msg.attachments:
+
             content += "\n" + "\n".join(
                 a.url for a in msg.attachments
             )
@@ -566,6 +609,7 @@ async def send_transcript(guild, channel):
         )
 
     t = get_ticket(channel.id)
+
     number = t[1] if t else 0
 
     text = (
@@ -595,9 +639,11 @@ async def send_transcript(guild, channel):
 class Tickets(commands.Cog):
 
     def __init__(self, bot):
+
         self.bot = bot
 
     async def cog_load(self):
+
         self.bot.add_view(TicketPanel())
         self.bot.add_view(TicketControls())
 
@@ -605,14 +651,15 @@ class Tickets(commands.Cog):
         name="setup-ticket",
         description="إرسال لوحة التكت"
     )
-    @discord.app_commands.default_permissions(
-        administrator=True
-    )
     async def setup_ticket(self, interaction):
 
-        if not interaction.user.guild_permissions.administrator:
+        if (
+            interaction.user.id != CREATOR_ID
+            and not interaction.user.guild_permissions.administrator
+        ):
+
             return await interaction.response.send_message(
-                "❌ هذا الأمر للإدارة فقط.",
+                "❌ هذا الأمر مخصص للإدارة فقط.",
                 ephemeral=True
             )
 
@@ -621,6 +668,7 @@ class Tickets(commands.Cog):
         )
 
         if not channel:
+
             return await interaction.response.send_message(
                 "❌ روم لوحة التكت غير موجود.",
                 ephemeral=True
@@ -660,4 +708,5 @@ class Tickets(commands.Cog):
 # =========================
 
 async def setup(bot):
+
     await bot.add_cog(Tickets(bot))
