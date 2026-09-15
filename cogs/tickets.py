@@ -14,6 +14,8 @@ CATEGORY_ID = 1548014683695620116
 PANEL_CHANNEL_ID = 1548014911932858398
 LOG_CHANNEL_ID = 1495450684731162664
 
+PANEL_IMAGE = "https://a.top4top.io/p_3910nb9nm0.png"
+
 STAFF_ROLES = [
     1498008105819177240,
     1497718287956443249,
@@ -125,106 +127,137 @@ def info_embed(guild, channel_id):
 
 async def create_ticket(interaction, ticket_type, reason):
 
-    guild = interaction.guild
-    category = guild.get_channel(CATEGORY_ID)
+    try:
+        # مهم جداً: يمنع Interaction Failed
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
 
-    if not category:
-        return await interaction.response.send_message(
-            "❌ كاتيجوري التكت غير موجود.",
-            ephemeral=True
-        )
+        guild = interaction.guild
+        category = guild.get_channel(CATEGORY_ID)
 
-    for ch in category.channels:
-
-        t = get_ticket(ch.id)
-
-        if t and t[4] == interaction.user.id and not t[8]:
-            return await interaction.response.send_message(
-                f"❌ عندك تكت مفتوح بالفعل: {ch.mention}",
+        if not category:
+            return await interaction.followup.send(
+                "❌ كاتيجوري التكت غير موجود.",
                 ephemeral=True
             )
 
-    number = next_number()
+        # منع أكثر من تكت مفتوح
+        for ch in category.channels:
 
-    prefix = {
-        "دعم فني": "دعم",
-        "استفسار": "استفسار",
-        "شكوى": "شكوى"
-    }.get(ticket_type, "تكت")
+            t = get_ticket(ch.id)
 
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(
-            view_channel=False
-        ),
+            if t and t[4] == interaction.user.id and not t[8]:
 
-        interaction.user: discord.PermissionOverwrite(
-            view_channel=True,
-            send_messages=True,
-            read_message_history=True,
-            attach_files=True
-        )
-    }
+                return await interaction.followup.send(
+                    f"❌ عندك تكت مفتوح بالفعل: {ch.mention}",
+                    ephemeral=True
+                )
 
-    for rid in STAFF_ROLES:
+        number = next_number()
 
-        role = guild.get_role(rid)
+        prefix = {
+            "دعم فني": "دعم",
+            "استفسار": "استفسار",
+            "شكوى": "شكوى"
+        }.get(ticket_type, "تكت")
 
-        if role:
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False
+            ),
 
-            overwrites[role] = discord.PermissionOverwrite(
+            interaction.user: discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
                 read_message_history=True,
-                attach_files=True,
-                manage_messages=True
+                attach_files=True
             )
+        }
 
-    channel = await guild.create_text_channel(
-        f"{prefix}・{number:04d}",
-        category=category,
-        overwrites=overwrites
-    )
+        # صلاحيات الإدارة
+        for rid in STAFF_ROLES:
 
-    db.execute("""
-        INSERT INTO tickets
-        (channel_id,number,type,reason,opener,opened)
-        VALUES (?,?,?,?,?,?)
-    """, (
-        channel.id,
-        number,
-        ticket_type,
-        reason,
-        interaction.user.id,
-        time_now()
-    ))
+            role = guild.get_role(rid)
 
-    db.commit()
+            if role:
 
-    await interaction.response.send_message(
-        f"🎫 تم فتح تذكرتك: {channel.mention}",
-        ephemeral=True
-    )
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                    manage_messages=True
+                )
 
-    roles = [
-        guild.get_role(rid).mention
-        for rid in STAFF_ROLES
-        if guild.get_role(rid)
-    ]
-
-    if roles:
-
-        await channel.send(
-            "📢 **تكت جديد يحتاج إلى الدعم**\n" +
-            " ".join(roles),
-            allowed_mentions=discord.AllowedMentions(roles=True)
+        # إنشاء الروم
+        channel = await guild.create_text_channel(
+            f"{prefix}・{number:04d}",
+            category=category,
+            overwrites=overwrites
         )
 
-    await channel.send(
-        f"أهلًا {interaction.user.mention} 👋\n"
-        "تم فتح تذكرتك بنجاح، يرجى الانتظار حتى يتم استلامها.",
-        embed=info_embed(guild, channel.id),
-        view=TicketControls()
-    )
+        # حفظ البيانات
+        db.execute("""
+            INSERT INTO tickets
+            (channel_id,number,type,reason,opener,opened)
+            VALUES (?,?,?,?,?,?)
+        """, (
+            channel.id,
+            number,
+            ticket_type,
+            reason,
+            interaction.user.id,
+            time_now()
+        ))
+
+        db.commit()
+
+        # رسالة خاصة لصاحب التكت
+        await interaction.followup.send(
+            f"🎫 تم فتح تذكرتك: {channel.mention}",
+            ephemeral=True
+        )
+
+        # منشن الإدارة
+        roles = []
+
+        for rid in STAFF_ROLES:
+
+            role = guild.get_role(rid)
+
+            if role:
+                roles.append(role.mention)
+
+        if roles:
+
+            await channel.send(
+                "📢 **تكت جديد يحتاج إلى الدعم**\n" +
+                " ".join(roles),
+                allowed_mentions=discord.AllowedMentions(
+                    roles=True
+                )
+            )
+
+        # بيانات التكت
+        await channel.send(
+            f"أهلًا {interaction.user.mention} 👋\n"
+            "تم فتح تذكرتك بنجاح، يرجى الانتظار حتى يتم استلامها.",
+            embed=info_embed(guild, channel.id),
+            view=TicketControls()
+        )
+
+    except Exception as e:
+
+        print("N9V TICKET ERROR:", repr(e))
+
+        try:
+            await interaction.followup.send(
+                "❌ حدث خطأ أثناء فتح التكت.\n"
+                "تأكد أن البوت لديه صلاحية **Manage Channels**.",
+                ephemeral=True
+            )
+        except:
+            pass
 
 
 # =========================
@@ -481,6 +514,13 @@ class TicketControls(discord.ui.View):
     )
     async def close(self, interaction, button):
 
+        if not staff(interaction.user) and interaction.user.id != CREATOR_ID:
+
+            return await interaction.response.send_message(
+                "❌ هذا الإجراء للإدارة فقط.",
+                ephemeral=True
+            )
+
         await interaction.response.send_modal(
             CloseModal()
         )
@@ -502,7 +542,9 @@ class TicketControls(discord.ui.View):
         await interaction.response.send_message(
             "📢 **تم تنبيه الإدارة**\n" +
             " ".join(roles),
-            allowed_mentions=discord.AllowedMentions(roles=True)
+            allowed_mentions=discord.AllowedMentions(
+                roles=True
+            )
         )
 
     @discord.ui.button(
@@ -653,6 +695,7 @@ class Tickets(commands.Cog):
     )
     async def setup_ticket(self, interaction):
 
+        # الصانع + الإدارة
         if (
             interaction.user.id != CREATOR_ID
             and not interaction.user.guild_permissions.administrator
@@ -688,6 +731,11 @@ class Tickets(commands.Cog):
             color=COLOR
         )
 
+        # صورة اللوحة
+        embed.set_image(
+            url=PANEL_IMAGE
+        )
+
         embed.set_footer(
             text="N9V・SUPPORT SYSTEM"
         )
@@ -698,7 +746,7 @@ class Tickets(commands.Cog):
         )
 
         await interaction.response.send_message(
-            f"✅ تم إرسال اللوحة في {channel.mention}",
+            f"✅ تم إرسال لوحة التكت في {channel.mention}",
             ephemeral=True
         )
 
