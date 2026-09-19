@@ -9,56 +9,83 @@ PANEL_IMAGE = "https://j.top4top.io/p_3914zdc6h0.jpg"
 STAFF_ROLE_ID = 1550169763853111427
 CATEGORY_ID = 1550170033655910541
 TRANSCRIPT_CHANNEL_ID = 1501909696766808155
-DB_NAME = "tickets.db"
+
+# قاعدة جديدة حتى لا تتعارض مع القديمة
+DB_NAME = "rawabi_tickets.db"
+
 COLOR = discord.Color.from_rgb(100, 0, 20)
 
 
 # ================= DATABASE =================
 
 def db():
-    c = sqlite3.connect(DB_NAME)
-    c.execute("""CREATE TABLE IF NOT EXISTS tickets(
-        channel INTEGER PRIMARY KEY,
-        user INTEGER,
-        number INTEGER,
-        type TEXT,
-        claimed INTEGER DEFAULT 0
-    )""")
-    c.execute("""CREATE TABLE IF NOT EXISTS counter(
-        id INTEGER PRIMARY KEY,
-        number INTEGER DEFAULT 0
-    )""")
-    c.execute("INSERT OR IGNORE INTO counter VALUES(1,0)")
+    c = sqlite3.connect(DB_NAME, timeout=10)
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS rawabi_tickets(
+            channel INTEGER PRIMARY KEY,
+            user INTEGER NOT NULL,
+            number INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            claimed INTEGER DEFAULT 0
+        )
+    """)
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS rawabi_counter(
+            id INTEGER PRIMARY KEY,
+            number INTEGER DEFAULT 0
+        )
+    """)
+
+    c.execute(
+        "INSERT OR IGNORE INTO rawabi_counter VALUES(1,0)"
+    )
+
     c.commit()
     return c
 
 
 def next_number():
     c = db()
-    n = c.execute("SELECT number FROM counter WHERE id=1").fetchone()[0] + 1
-    c.execute("UPDATE counter SET number=? WHERE id=1", (n,))
+
+    n = c.execute(
+        "SELECT number FROM rawabi_counter WHERE id=1"
+    ).fetchone()[0] + 1
+
+    c.execute(
+        "UPDATE rawabi_counter SET number=? WHERE id=1",
+        (n,)
+    )
+
     c.commit()
     c.close()
+
     return n
 
 
 def get_ticket(channel):
     c = db()
+
     x = c.execute(
-        "SELECT * FROM tickets WHERE channel=?",
+        "SELECT * FROM rawabi_tickets WHERE channel=?",
         (channel,)
     ).fetchone()
+
     c.close()
     return x
 
 
 def user_ticket(user):
     c = db()
+
     x = c.execute(
-        "SELECT channel FROM tickets WHERE user=?",
+        "SELECT channel FROM rawabi_tickets WHERE user=?",
         (user,)
     ).fetchone()
+
     c.close()
+
     return x[0] if x else None
 
 
@@ -92,12 +119,14 @@ class ServerModal(discord.ui.Modal, title="🌿 تذكرة السيرفر"):
 
     reason = discord.ui.TextInput(
         label="ما سبب فتح التكت؟",
-        style=discord.TextStyle.paragraph
+        style=discord.TextStyle.paragraph,
+        required=True
     )
 
     details = discord.ui.TextInput(
         label="شرح المشكلة / الطلب",
-        style=discord.TextStyle.paragraph
+        style=discord.TextStyle.paragraph,
+        required=True
     )
 
     async def on_submit(self, i):
@@ -114,16 +143,19 @@ class MapModal(discord.ui.Modal, title="🎮 تذكرة الماب"):
 
     reason = discord.ui.TextInput(
         label="ما سبب فتح التكت؟",
-        style=discord.TextStyle.paragraph
+        style=discord.TextStyle.paragraph,
+        required=True
     )
 
     roblox = discord.ui.TextInput(
-        label="يوزرك في روبلوكس"
+        label="يوزرك في روبلوكس",
+        required=True
     )
 
     details = discord.ui.TextInput(
         label="التفاصيل",
-        style=discord.TextStyle.paragraph
+        style=discord.TextStyle.paragraph,
+        required=True
     )
 
     async def on_submit(self, i):
@@ -143,15 +175,19 @@ class TicketSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(
             placeholder="🎫 اختر نوع التذكرة",
+            min_values=1,
+            max_values=1,
             custom_id="rawabi_ticket_select",
             options=[
                 discord.SelectOption(
                     label="تذكرة السيرفر",
+                    description="فتح تذكرة خاصة بالسيرفر",
                     emoji="🌿",
                     value="server"
                 ),
                 discord.SelectOption(
                     label="تذكرة الماب",
+                    description="فتح تذكرة خاصة بالماب",
                     emoji="🎮",
                     value="map"
                 )
@@ -160,22 +196,41 @@ class TicketSelect(discord.ui.Select):
 
     async def callback(self, i):
 
-        if user_ticket(i.user.id):
-            ch = i.guild.get_channel(
-                user_ticket(i.user.id)
-            )
+        try:
+            old = user_ticket(i.user.id)
 
-            if ch:
-                return await i.response.send_message(
-                    f"❌ لديك تكت مفتوحة: {ch.mention}",
+            if old:
+                ch = i.guild.get_channel(old)
+
+                if ch:
+                    await i.response.send_message(
+                        f"❌ لديك تكت مفتوحة بالفعل: {ch.mention}",
+                        ephemeral=True
+                    )
+                    return
+
+                c = db()
+                c.execute(
+                    "DELETE FROM rawabi_tickets WHERE channel=?",
+                    (old,)
+                )
+                c.commit()
+                c.close()
+
+            if self.values[0] == "server":
+                await i.response.send_modal(ServerModal())
+            else:
+                await i.response.send_modal(MapModal())
+
+        except Exception as e:
+
+            print(f"[RAWABI SELECT ERROR] {e}")
+
+            if not i.response.is_done():
+                await i.response.send_message(
+                    "❌ حدث خطأ أثناء فتح التكت، حاول مرة أخرى.",
                     ephemeral=True
                 )
-
-        await i.response.send_modal(
-            ServerModal()
-            if self.values[0] == "server"
-            else MapModal()
-        )
 
 
 # ================= PANEL VIEW =================
@@ -187,12 +242,14 @@ class TicketPanelView(discord.ui.View):
         self.add_item(TicketSelect())
 
 
-# ================= TICKET BUTTONS =================
+# ================= TICKET VIEW =================
 
 class TicketView(discord.ui.View):
 
     def __init__(self):
         super().__init__(timeout=None)
+
+    # ================= CLAIM =================
 
     @discord.ui.button(
         label="استلام التذكرة",
@@ -224,25 +281,32 @@ class TicketView(discord.ui.View):
 
         if t[4]:
             return await i.response.send_message(
-                "❌ التكت مستلمة بالفعل.",
+                f"❌ التكت مستلمة بالفعل بواسطة <@{t[4]}>.",
                 ephemeral=True
             )
 
         c = db()
+
         c.execute(
-            "UPDATE tickets SET claimed=? WHERE channel=?",
+            "UPDATE rawabi_tickets SET claimed=? WHERE channel=?",
             (i.user.id, i.channel.id)
         )
+
         c.commit()
         c.close()
 
         await i.response.send_message(
             embed=discord.Embed(
                 title="📥 تم استلام التذكرة",
-                description=f"تم استلام التذكرة بواسطة {i.user.mention}",
+                description=(
+                    f"🛡️ تم استلام التذكرة بواسطة "
+                    f"{i.user.mention}"
+                ),
                 color=COLOR
             )
         )
+
+    # ================= CLOSE =================
 
     @discord.ui.button(
         label="إغلاق التذكرة",
@@ -273,36 +337,42 @@ class TicketView(discord.ui.View):
             )
 
         await i.response.send_message(
-            "🔒 جاري حفظ التكت وإغلاقها..."
+            "🔒 جاري حفظ نسخة التكت وإغلاقها..."
         )
 
         data = await transcript(i.channel)
-
-        file = discord.File(
-            io.BytesIO(data.encode("utf-8")),
-            filename=f"{i.channel.name}.txt"
-        )
 
         log = i.guild.get_channel(
             TRANSCRIPT_CHANNEL_ID
         )
 
         if log:
-            await log.send(
-                embed=discord.Embed(
-                    title="📁 تكت مغلقة",
-                    description=(
-                        f"👤 العضو: <@{t[1]}>\n"
-                        f"🔢 الرقم: `{t[2]}`\n"
-                        f"🎫 النوع: {t[3]}\n"
-                        f"🔒 أغلقها: {i.user.mention}"
-                    ),
-                    color=COLOR
-                ),
-                file=file
+
+            file = discord.File(
+                io.BytesIO(data.encode("utf-8")),
+                filename=f"{i.channel.name}.txt"
             )
 
+            try:
+                await log.send(
+                    embed=discord.Embed(
+                        title="📁 تكت مغلقة",
+                        description=(
+                            f"👤 العضو: <@{t[1]}>\n"
+                            f"🔢 الرقم: `{t[2]}`\n"
+                            f"🎫 النوع: {t[3]}\n"
+                            f"🔒 أغلقها: {i.user.mention}"
+                        ),
+                        color=COLOR
+                    ),
+                    file=file
+                )
+            except Exception as e:
+                print(f"[TRANSCRIPT ERROR] {e}")
+
+        # إرسال النسخة للعضو
         try:
+
             user = await i.guild.fetch_member(t[1])
 
             dm_file = discord.File(
@@ -318,21 +388,23 @@ class TicketView(discord.ui.View):
                 file=dm_file
             )
 
-        except:
-            pass
+        except Exception as e:
+            print(f"[DM TRANSCRIPT ERROR] {e}")
 
         c = db()
+
         c.execute(
-            "DELETE FROM tickets WHERE channel=?",
+            "DELETE FROM rawabi_tickets WHERE channel=?",
             (i.channel.id,)
         )
+
         c.commit()
         c.close()
 
         await i.channel.delete()
 
 
-# ================= CREATE =================
+# ================= CREATE TICKET =================
 
 async def create_ticket(
     i,
@@ -345,6 +417,7 @@ async def create_ticket(
     old = user_ticket(i.user.id)
 
     if old:
+
         ch = i.guild.get_channel(old)
 
         if ch:
@@ -354,10 +427,12 @@ async def create_ticket(
             )
 
         c = db()
+
         c.execute(
-            "DELETE FROM tickets WHERE channel=?",
+            "DELETE FROM rawabi_tickets WHERE channel=?",
             (old,)
         )
+
         c.commit()
         c.close()
 
@@ -371,7 +446,10 @@ async def create_ticket(
 
     category = i.guild.get_channel(CATEGORY_ID)
 
-    if not isinstance(category, discord.CategoryChannel):
+    if not isinstance(
+        category,
+        discord.CategoryChannel
+    ):
         category = None
 
     staff = i.guild.get_role(STAFF_ROLE_ID)
@@ -392,6 +470,7 @@ async def create_ticket(
     }
 
     if staff:
+
         overwrites[staff] = discord.PermissionOverwrite(
             view_channel=True,
             send_messages=True,
@@ -406,8 +485,13 @@ async def create_ticket(
     )
 
     c = db()
+
     c.execute(
-        "INSERT INTO tickets VALUES(?,?,?,?,0)",
+        """
+        INSERT INTO rawabi_tickets
+        (channel,user,number,type,claimed)
+        VALUES(?,?,?,?,0)
+        """,
         (
             ch.id,
             i.user.id,
@@ -415,6 +499,7 @@ async def create_ticket(
             ticket_type
         )
     )
+
     c.commit()
     c.close()
 
@@ -460,7 +545,10 @@ async def create_ticket(
     embed.set_image(url=PANEL_IMAGE)
 
     await ch.send(
-        content=f"{i.user.mention} {staff.mention if staff else ''}",
+        content=(
+            f"{i.user.mention} "
+            f"{staff.mention if staff else ''}"
+        ),
         embed=embed,
         view=TicketView()
     )
@@ -520,14 +608,17 @@ class Tickets(commands.Cog):
             description=(
                 "نسعد بخدمتكم ومساعدتكم، ونسعى دائمًا "
                 "لتقديم أفضل تجربة ممكنة لكم 🤍\n\n"
+
                 "📌 **قبل فتح التكت:**\n"
                 "• اكتب سبب التكت بوضوح.\n"
                 "• اشرح المشكلة أو الطلب بالتفصيل.\n"
                 "• أرفق الدليل إن وجد.\n"
                 "• يمنع فتح أكثر من تكت لنفس المشكلة.\n"
                 "• يرجى احترام فريق الدعم.\n\n"
+
                 "⚠️ **تنبيه:**\n"
                 "يرجى الانتظار حتى يرد عليك أحد أعضاء الدعم.\n\n"
+
                 "**فريق دعم شاليه روابي**"
             ),
             color=COLOR
@@ -546,10 +637,12 @@ class Tickets(commands.Cog):
         )
 
 
+# ================= SETUP =================
+
 async def setup(bot):
 
     await bot.add_cog(Tickets(bot))
 
-    # Persistent Views
+    # Persistent - لا تنتهي بعد إعادة تشغيل البوت
     bot.add_view(TicketPanelView())
     bot.add_view(TicketView())
