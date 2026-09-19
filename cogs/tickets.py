@@ -9,8 +9,6 @@ PANEL_IMAGE = "https://j.top4top.io/p_3914zdc6h0.jpg"
 STAFF_ROLE_ID = 1550169763853111427
 CATEGORY_ID = 1550170033655910541
 TRANSCRIPT_CHANNEL_ID = 1501909696766808155
-
-# قاعدة جديدة حتى لا تتعارض مع القديمة
 DB_NAME = "rawabi_tickets.db"
 
 COLOR = discord.Color.from_rgb(100, 0, 20)
@@ -87,6 +85,16 @@ def user_ticket(user):
     c.close()
 
     return x[0] if x else None
+
+
+# ================= STAFF =================
+
+def is_staff(member: discord.Member):
+    return (
+        member.guild_permissions.administrator
+        or member.guild_permissions.manage_channels
+        or STAFF_ROLE_ID in [r.id for r in member.roles]
+    )
 
 
 # ================= TRANSCRIPT =================
@@ -257,17 +265,19 @@ class TicketView(discord.ui.View):
         style=discord.ButtonStyle.primary,
         custom_id="rawabi_ticket_claim"
     )
-    async def claim(self, i, button):
+    async def claim(
+        self,
+        i: discord.Interaction,
+        button: discord.ui.Button
+    ):
 
         if not isinstance(i.user, discord.Member):
             return
 
-        if (
-            not i.user.guild_permissions.manage_channels
-            and STAFF_ROLE_ID not in [r.id for r in i.user.roles]
-        ):
+        # منع غير الإداري
+        if not is_staff(i.user):
             return await i.response.send_message(
-                "❌ هذا الزر لفريق الدعم فقط.",
+                "❌ تم رفض طلبك، أنت مو إداري.",
                 ephemeral=True
             )
 
@@ -279,10 +289,14 @@ class TicketView(discord.ui.View):
                 ephemeral=True
             )
 
+        # التكت مستلمة مسبقاً
         if t[4]:
             return await i.response.send_message(
                 f"❌ التكت مستلمة بالفعل بواسطة <@{t[4]}>.",
-                ephemeral=True
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions(
+                    users=True
+                )
             )
 
         c = db()
@@ -295,6 +309,56 @@ class TicketView(discord.ui.View):
         c.commit()
         c.close()
 
+        # تحديث رسالة معلومات التكت
+        async for message in i.channel.history(
+            limit=20,
+            oldest_first=False
+        ):
+
+            if not message.embeds:
+                continue
+
+            embed = message.embeds[0]
+
+            has_owner = any(
+                f.name == "👤 مالك التذكرة:"
+                for f in embed.fields
+            )
+
+            if not has_owner:
+                continue
+
+            new_embed = embed.copy()
+
+            for index, field in enumerate(
+                new_embed.fields
+            ):
+
+                if field.name == "🛡️ مشرفي التذاكر:":
+
+                    new_embed.set_field_at(
+                        index,
+                        name="🛡️ مشرفي التذاكر:",
+                        value=(
+                            f"<@&{STAFF_ROLE_ID}>\n"
+                            f"📥 **مستلم التذكرة:** "
+                            f"{i.user.mention}"
+                        ),
+                        inline=False
+                    )
+
+                    break
+
+            await message.edit(
+                embed=new_embed,
+                allowed_mentions=discord.AllowedMentions(
+                    roles=True,
+                    users=True
+                )
+            )
+
+            break
+
         await i.response.send_message(
             embed=discord.Embed(
                 title="📥 تم استلام التذكرة",
@@ -303,6 +367,9 @@ class TicketView(discord.ui.View):
                     f"{i.user.mention}"
                 ),
                 color=COLOR
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True
             )
         )
 
@@ -314,17 +381,19 @@ class TicketView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="rawabi_ticket_close"
     )
-    async def close(self, i, button):
+    async def close(
+        self,
+        i: discord.Interaction,
+        button: discord.ui.Button
+    ):
 
         if not isinstance(i.user, discord.Member):
             return
 
-        if (
-            not i.user.guild_permissions.manage_channels
-            and STAFF_ROLE_ID not in [r.id for r in i.user.roles]
-        ):
+        # منع غير الإداري
+        if not is_staff(i.user):
             return await i.response.send_message(
-                "❌ لا تملك صلاحية إغلاق التكت.",
+                "❌ تم رفض طلبك، أنت مو إداري.",
                 ephemeral=True
             )
 
@@ -342,6 +411,8 @@ class TicketView(discord.ui.View):
 
         data = await transcript(i.channel)
 
+        # ================= LOG =================
+
         log = i.guild.get_channel(
             TRANSCRIPT_CHANNEL_ID
         )
@@ -354,6 +425,7 @@ class TicketView(discord.ui.View):
             )
 
             try:
+
                 await log.send(
                     embed=discord.Embed(
                         title="📁 تكت مغلقة",
@@ -365,12 +437,17 @@ class TicketView(discord.ui.View):
                         ),
                         color=COLOR
                     ),
-                    file=file
+                    file=file,
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True
+                    )
                 )
+
             except Exception as e:
                 print(f"[TRANSCRIPT ERROR] {e}")
 
-        # إرسال النسخة للعضو
+        # ================= DM =================
+
         try:
 
             user = await i.guild.fetch_member(t[1])
@@ -391,6 +468,8 @@ class TicketView(discord.ui.View):
         except Exception as e:
             print(f"[DM TRANSCRIPT ERROR] {e}")
 
+        # ================= DELETE DATABASE =================
+
         c = db()
 
         c.execute(
@@ -400,6 +479,8 @@ class TicketView(discord.ui.View):
 
         c.commit()
         c.close()
+
+        # ================= DELETE CHANNEL =================
 
         await i.channel.delete()
 
@@ -444,7 +525,9 @@ async def create_ticket(
         else f"تذكرة-الماب-{number:03d}"
     )
 
-    category = i.guild.get_channel(CATEGORY_ID)
+    category = i.guild.get_channel(
+        CATEGORY_ID
+    )
 
     if not isinstance(
         category,
@@ -452,7 +535,9 @@ async def create_ticket(
     ):
         category = None
 
-    staff = i.guild.get_role(STAFF_ROLE_ID)
+    staff = i.guild.get_role(
+        STAFF_ROLE_ID
+    )
 
     overwrites = {
         i.guild.default_role:
@@ -508,6 +593,8 @@ async def create_ticket(
         ephemeral=True
     )
 
+    # ================= INFO EMBED =================
+
     embed = discord.Embed(
         color=COLOR
     )
@@ -520,7 +607,11 @@ async def create_ticket(
 
     embed.add_field(
         name="🛡️ مشرفي التذاكر:",
-        value=staff.mention if staff else "غير موجود",
+        value=(
+            f"<@&{STAFF_ROLE_ID}>"
+            if staff
+            else "غير موجود"
+        ),
         inline=False
     )
 
@@ -542,16 +633,25 @@ async def create_ticket(
         inline=False
     )
 
-    embed.set_image(url=PANEL_IMAGE)
+    embed.set_image(
+        url=PANEL_IMAGE
+    )
 
+    # يمنشن العضو + رتبة الإدارة فعلياً
     await ch.send(
         content=(
-            f"{i.user.mention} "
-            f"{staff.mention if staff else ''}"
+            f"{i.user.mention}\n"
+            f"<@&{STAFF_ROLE_ID}>"
         ),
         embed=embed,
-        view=TicketView()
+        view=TicketView(),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=True
+        )
     )
+
+    # ================= DETAILS =================
 
     info = discord.Embed(
         title="📝 تفاصيل التذكرة",
@@ -571,6 +671,7 @@ async def create_ticket(
     )
 
     if roblox:
+
         info.add_field(
             name="🎮 يوزر روبلوكس",
             value=roblox,
@@ -583,7 +684,9 @@ async def create_ticket(
         inline=False
     )
 
-    await ch.send(embed=info)
+    await ch.send(
+        embed=info
+    )
 
 
 # ================= COG =================
@@ -601,7 +704,10 @@ class Tickets(commands.Cog):
     @app_commands.default_permissions(
         administrator=True
     )
-    async def ticket_panel(self, i):
+    async def ticket_panel(
+        self,
+        i: discord.Interaction
+    ):
 
         embed = discord.Embed(
             title="🌿 مرحبًا بكم في الدعم الفني لشاليه روابي 🌿",
@@ -624,7 +730,9 @@ class Tickets(commands.Cog):
             color=COLOR
         )
 
-        embed.set_image(url=PANEL_IMAGE)
+        embed.set_image(
+            url=PANEL_IMAGE
+        )
 
         await i.channel.send(
             embed=embed,
@@ -641,8 +749,15 @@ class Tickets(commands.Cog):
 
 async def setup(bot):
 
-    await bot.add_cog(Tickets(bot))
+    await bot.add_cog(
+        Tickets(bot)
+    )
 
-    # Persistent - لا تنتهي بعد إعادة تشغيل البوت
-    bot.add_view(TicketPanelView())
-    bot.add_view(TicketView())
+    # Persistent Views
+    bot.add_view(
+        TicketPanelView()
+    )
+
+    bot.add_view(
+        TicketView()
+    )
