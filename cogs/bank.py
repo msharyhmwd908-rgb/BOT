@@ -13,7 +13,7 @@ DB_FILE = "bank.db"
 
 OWNER_USER_ID = 1495450684731162664
 
-PANEL_IMAGE = "https://b.top4top.io/p_3915466zl0.jp"
+PANEL_IMAGE = "https://e.top4top.io/p_39154nnr40.png"
 
 SALARY_AMOUNT = 1000
 SALARY_COOLDOWN = 24 * 60 * 60
