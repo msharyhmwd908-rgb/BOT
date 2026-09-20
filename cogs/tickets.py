@@ -5,7 +5,7 @@ import sqlite3
 import io
 from datetime import datetime
 
-PANEL_IMAGE = "https://j.top4top.io/p_3914zdc6h0.jpg"
+PANEL_IMAGE = "https://e.top4top.io/p_39154nnr40.png"
 STAFF_ROLE_ID = 1550169763853111427
 CATEGORY_ID = 1550170033655910541
 TRANSCRIPT_CHANNEL_ID = 1501909696766808155
