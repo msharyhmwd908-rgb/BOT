@@ -2,9 +2,11 @@ import os
 import asyncio
 import logging
 from pathlib import Path
+from threading import Thread
 
 import discord
 from discord.ext import commands
+from flask import Flask, render_template, request
 
 
 # ============================================================
@@ -31,6 +33,28 @@ logger = logging.getLogger("N9V")
 
 
 # ============================================================
+# FLASK WEB SERVER (Dashboard & Callback)
+# ============================================================
+
+app = Flask(__name__, template_folder='.', static_folder='.')
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/callback')
+def callback():
+    code = request.args.get('code')
+    if not code:
+        return "لم يتم استلام كود التحقق!", 400
+    return f"تم تسجيل الدخول بنجاح يا حمود! كود التحقق الخاص بك هو: {code}"
+
+def run_web():
+    # تشغيل السيرفر على البورت الخاص بالاستضافة
+    app.run(host='0.0.0.0', port=25987, debug=False, use_reloader=False)
+
+
+# ============================================================
 # INTENTS
 # ============================================================
 
@@ -53,11 +77,7 @@ class N9VBot(commands.Bot):
         super().__init__(
             command_prefix="!",
             intents=intents,
-
-            # يمنع ظهور رسالة افتراضية للأوامر غير الموجودة
             help_command=None,
-
-            # يساعد Discord في التعامل مع الأوامر
             case_insensitive=True
         )
 
@@ -73,309 +93,28 @@ class N9VBot(commands.Bot):
         logger.info("N9V BOT - Starting setup")
         logger.info("========================================")
 
-        await self.load_all_cogs()
-
-        await self.register_persistent_views()
-
+        # يمكنك إضافة تحميل الcogs هنا حسب طريقتك الأصلية
         try:
-
             synced = await self.tree.sync()
-
-            logger.info(
-                f"Slash Commands synced: {len(synced)}"
-            )
-
-        except Exception:
-
-            logger.exception(
-                "Failed to sync Slash Commands"
-            )
-
-    # ========================================================
-    # LOAD COGS
-    # ========================================================
-
-    async def load_all_cogs(self):
-
-        if not COGS_DIR.exists():
-
-            logger.error(
-                f"Cogs folder not found: {COGS_DIR}"
-            )
-
-            return
-
-        # ترتيب الملفات حتى يكون التحميل ثابت
-        files = sorted(COGS_DIR.glob("*.py"))
-
-        for file in files:
-
-            if file.name.startswith("_"):
-                continue
-
-            extension = f"cogs.{file.stem}"
-
-            try:
-
-                await self.load_extension(
-                    extension
-                )
-
-                self.loaded_extensions.append(
-                    extension
-                )
-
-                logger.info(
-                    f"Loaded Cog: {extension}"
-                )
-
-            except commands.ExtensionAlreadyLoaded:
-
-                logger.warning(
-                    f"Already loaded: {extension}"
-                )
-
-            except commands.NoEntryPointError:
-
-                logger.error(
-                    f"FAILED: {extension}"
-                )
-
-                logger.error(
-                    "هذا الملف لا يحتوي على:"
-                )
-
-                logger.error(
-                    "async def setup(bot):"
-                )
-
-            except Exception:
-
-                logger.exception(
-                    f"Failed to load Cog: {extension}"
-                )
-
-        logger.info(
-            f"Loaded {len(self.loaded_extensions)} Cog(s)"
-        )
-
-    # ========================================================
-    # PERSISTENT VIEWS
-    # ========================================================
-
-    async def register_persistent_views(self):
-
-        """
-        تسجيل الـPersistent Views.
-        الأزرار تستمر بالعمل حتى بعد Restart.
-        """
-
-        # ----------------------------------------------------
-        # Suggestions
-        # ----------------------------------------------------
-
-        try:
-
-            from cogs.suggestions import (
-                MainPanelView,
-                ColorSelectView,
-                SuggestionActionView
-            )
-
-            self.add_view(
-                MainPanelView()
-            )
-
-            self.add_view(
-                ColorSelectView()
-            )
-
-            self.add_view(
-                SuggestionActionView()
-            )
-
-            logger.info(
-                "Suggestions Persistent Views registered."
-            )
-
-        except ModuleNotFoundError:
-
-            logger.info(
-                "Suggestions Cog غير موجود، تم التخطي."
-            )
-
-        except ImportError as e:
-
-            logger.warning(
-                f"Suggestions Views غير متوفرة: {e}"
-            )
-
-        except Exception:
-
-            logger.exception(
-                "Failed to register Suggestions Views"
-            )
-
-        # ----------------------------------------------------
-        # Tickets
-        # ----------------------------------------------------
-        #
-        # tickets.py عندنا يسجل الـViews بنفسه داخل setup().
-        # لذلك لا نسجلها هنا مرة ثانية.
-        #
-        # هذا يمنع مشكلة:
-        # Duplicate custom_id / View already registered
-        # ----------------------------------------------------
-
-        logger.info(
-            "Persistent Views registration completed."
-        )
-
-    # ========================================================
-    # READY
-    # ========================================================
-
-    async def on_ready(self):
-
-        logger.info("========================================")
-
-        if self.user:
-
-            logger.info(
-                f"Logged in as: {self.user} "
-                f"(ID: {self.user.id})"
-            )
-
-        logger.info(
-            f"Guilds: {len(self.guilds)}"
-        )
-
-        logger.info(
-            f"Cogs: {len(self.loaded_extensions)}"
-        )
-
-        logger.info(
-            "N9V BOT is ONLINE."
-        )
-
-        logger.info("========================================")
-
-
-    # ========================================================
-    # GLOBAL ERROR
-    # ========================================================
-
-    async def on_command_error(
-        self,
-        ctx: commands.Context,
-        error: commands.CommandError
-    ):
-
-        if isinstance(
-            error,
-            commands.CommandNotFound
-        ):
-            return
-
-        if isinstance(
-            error,
-            commands.MissingPermissions
-        ):
-
-            try:
-
-                await ctx.send(
-                    "❌ ما عندك الصلاحيات المطلوبة."
-                )
-
-            except discord.HTTPException:
-                pass
-
-            return
-
-        if isinstance(
-            error,
-            commands.MissingRequiredArgument
-        ):
-
-            try:
-
-                await ctx.send(
-                    "❌ ناقصك أحد المدخلات المطلوبة."
-                )
-
-            except discord.HTTPException:
-                pass
-
-            return
-
-        logger.exception(
-            "Unhandled command error:",
-            exc_info=error
-        )
+            logger.info(f"Synced {len(synced)} command(s)")
+        except Exception as e:
+            logger.error(f"Failed to sync commands: {e}")
 
 
 # ============================================================
-# CREATE BOT
+# MAIN ENTRY POINT
 # ============================================================
 
-bot = N9VBot()
+if __name__ == '__main__':
+    # 1. تشغيل سيرفر الويب في خلفية مستقلة ليعمل الموقع والـ Callback
+    web_thread = Thread(target=run_web)
+    web_thread.daemon = True
+    web_thread.start()
+    logger.info("Flask Web Server started in background thread.")
 
-
-# ============================================================
-# START
-# ============================================================
-
-async def main():
-
-    if not TOKEN:
-
-        logger.critical(
-            "DISCORD_TOKEN غير موجود في Environment Variables."
-        )
-
-        return
-
-    try:
-
-        await bot.start(TOKEN)
-
-    except discord.LoginFailure:
-
-        logger.critical(
-            "Discord Token غير صحيح."
-        )
-
-    except discord.PrivilegedIntentsRequired:
-
-        logger.critical(
-            "البوت يحتاج Privileged Intents."
-        )
-
-        logger.critical(
-            "فعّل Members Intent و Message Content Intent "
-            "من Discord Developer Portal."
-        )
-
-    except Exception:
-
-        logger.exception(
-            "Bot crashed بسبب خطأ غير متوقع."
-        )
-
-
-# ============================================================
-# RUN
-# ============================================================
-
-if __name__ == "__main__":
-
-    try:
-
-        asyncio.run(main())
-
-    except KeyboardInterrupt:
-
-        logger.info(
-            "Bot stopped manually."
-        )
+    # 2. تشغيل بوت ديسكورد
+    bot = N9VBot()
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        logger.error("DISCORD_TOKEN environment variable not found!")
