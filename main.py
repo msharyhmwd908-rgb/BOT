@@ -36,7 +36,8 @@ logger = logging.getLogger("N9V")
 # FLASK WEB SERVER (Dashboard & Callback)
 # ============================================================
 
-app = Flask(__name__, template_folder='.', static_folder='.')
+# جعل مجلد القوالب وملفات الـ Static نفس مجلد السيرفر الحالي
+app = Flask(__name__, template_folder=str(BASE_DIR), static_folder=str(BASE_DIR))
 
 @app.route('/')
 def home():
