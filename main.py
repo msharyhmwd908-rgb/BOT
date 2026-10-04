@@ -36,8 +36,8 @@ logger = logging.getLogger("N9V")
 # FLASK WEB SERVER (Dashboard & Callback)
 # ============================================================
 
-# جعل مجلد القوالب وملفات الـ Static نفس مجلد السيرفر الحالي
-app = Flask(__name__, template_folder=str(BASE_DIR), static_folder=str(BASE_DIR))
+# ضبط مسار القوالب ومجلد الـ static الصحيح
+app = Flask(__name__, template_folder='.', static_folder='static')
 
 @app.route('/')
 def home():
@@ -60,7 +60,6 @@ def run_web():
 # ============================================================
 
 intents = discord.Intents.default()
-
 intents.guilds = True
 intents.members = True
 intents.messages = True
@@ -74,32 +73,29 @@ intents.message_content = True
 class N9VBot(commands.Bot):
 
     def __init__(self):
-
         super().__init__(
             command_prefix="!",
             intents=intents,
             help_command=None,
             case_insensitive=True
         )
-
         self.loaded_extensions = []
 
-    # ========================================================
-    # SETUP HOOK
-    # ========================================================
-
     async def setup_hook(self):
-
         logger.info("========================================")
         logger.info("N9V BOT - Starting setup")
         logger.info("========================================")
 
-        # يمكنك إضافة تحميل الcogs هنا حسب طريقتك الأصلية
         try:
+            # تحديث ومزامنة الأوامر لحل مشكلة الأوامر القديمة التي لم تُحذف
             synced = await self.tree.sync()
-            logger.info(f"Synced {len(synced)} command(s)")
+            logger.info(f"Successfully synced {len(synced)} command(s)")
         except Exception as e:
             logger.error(f"Failed to sync commands: {e}")
+
+    async def on_ready(self):
+        logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
+        logger.info("N9V Bot is fully online and ready!")
 
 
 # ============================================================
