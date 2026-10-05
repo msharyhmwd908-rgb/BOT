@@ -13,6 +13,7 @@
             height: 100%;
             background-color: #0b0713;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
         .container {
             width: 100%;
@@ -47,7 +48,7 @@
             object-fit: cover;
             display: block;
         }
-        /* ضبط مكان الزر الشفاف تماماً فوق زر "أكمل" */
+        /* زر أكمل مع إزالة أي إطار أزرق أو تأثير مزعج عند الضغط */
         .image-clickable-btn {
             position: absolute;
             bottom: 12%;
@@ -59,9 +60,10 @@
             background: transparent;
             cursor: pointer;
             border: none;
-            outline: none;
+            outline: none !important;
+            box-shadow: none !important;
         }
-        /* ضبط مكان الزر الشفاف تماماً فوق زر "تسجيل" في الصفحة الثانية */
+        /* زر تسجيل مع إزالة أي إطار أزرق أو تحديد عند اللمس */
         .register-clickable-btn {
             position: absolute;
             bottom: 12%;
@@ -73,7 +75,12 @@
             background: transparent;
             cursor: pointer;
             border: none;
-            outline: none;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        button:focus, button:active {
+            outline: none !important;
+            border: none !important;
         }
     </style>
 </head>
