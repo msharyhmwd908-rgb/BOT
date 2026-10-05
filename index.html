@@ -6,6 +6,21 @@
     <title>ترحيب - بوت نجم | BOT Najm</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        body {
+            background-color: #0b0713;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         /* تنسيق الصفحة الأولى لتكون صورتك الفخمة بالكامل */
         #page1.active {
             display: flex;
@@ -16,7 +31,7 @@
         .welcome-image-box {
             position: relative;
             max-width: 420px;
-            width: 100%;
+            width: 90%;
             text-align: center;
         }
         .welcome-image-box img {
@@ -25,7 +40,7 @@
             display: block;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
-        /* زر مخفي شفاف تماماً يطابق مكان زر "أكمل" المرسوم في أسفل صورتك[span_1](start_span)[span_1](end_span) */
+        /* زر مخفي شفاف تماماً يطابق مكان زر "أكمل" المرسوم في أسفل صورتك */
         .image-clickable-btn {
             position: absolute;
             bottom: 6%;
@@ -37,6 +52,15 @@
             border: none;
             outline: none;
         }
+        .page {
+            display: none;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+        }
+        .page.active {
+            display: flex;
+        }
     </style>
 </head>
 <body>
@@ -46,17 +70,17 @@
         <!-- الصفحة الأولى (صورتك الفخمة) -->
         <div id="page1" class="page active">
             <div class="welcome-image-box">
-                <!-- تأكد أن صورتك مرفوعة في مجلد static باسم welcome-bg.jpg[span_2](start_span)[span_2](end_span) -->
-                <img src="{{ url_for('static', filename='welcome-bg.jpg') }}" alt="ترحيب بوت نجم">
+                <!-- جلب الصورة مع معالجة ذكية للصيغ لتجنب خطأ عدم ظهورها -->
+                <img src="{{ url_for('static', filename='welcome-bg.jpg') }}" alt="ترحيب بوت نجم" onerror="this.onerror=null; this.src='{{ url_for('static', filename='welcome-bg.png') }}';">
                 
-                <!-- زر تفاعلي شفاف فوق زر "أكمل" المرسوم في الصورة لينقلك للصفحة الثانية[span_3](start_span)[span_3](end_span) -->
+                <!-- زر تفاعلي شفاف فوق زر "أكمل" المرسوم في الصورة لينقلك للصفحة الثانية -->
                 <button class="image-clickable-btn" onclick="goToPage2()"></button>
             </div>
         </div>
 
         <!-- الصفحة الثانية -->
-        <div id="page2" class="page">
-            <div class="fancy-box">
+        <div id="page2" class="page" style="flex-direction: column;">
+            <div class="fancy-box" style="max-width: 400px; width: 90%;">
                 <h2 style="margin-bottom: 20px; font-size: 22px;">ماذا نريد منكـ/ـي؟</h2>
                 <p class="welcome-text" style="font-size: 17px;">
                     ما نبي منك سوى دعمنا ونشر بوت نجم لأي شخص تعرفه عشان يوصل لأكبر عدد ويستفيد الكل، وبيض الله وجهك مقدماً!
