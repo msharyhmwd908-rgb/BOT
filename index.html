@@ -35,7 +35,6 @@
             display: flex;
             flex-direction: column;
         }
-        /* جعل الصورة تغطي الشاشة بالكامل */
         .welcome-image-box {
             position: relative;
             width: 100vw;
@@ -45,17 +44,32 @@
         .welcome-image-box img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* لضمان تغطية الشاشة بالكامل بدون تشويه */
+            object-fit: cover;
             display: block;
         }
-        /* تعديل مكان الزر الشفاف ليطابق زر "أكمل" بحجم الشاشة الكامل */
+        /* ضبط مكان الزر الشفاف تماماً فوق زر "أكمل" */
         .image-clickable-btn {
             position: absolute;
-            bottom: 8%;
+            bottom: 12%;
             left: 50%;
             transform: translateX(-50%);
-            width: 250px;
-            height: 60px;
+            width: 45%;
+            max-width: 280px;
+            height: 8%;
+            background: transparent;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        /* ضبط مكان الزر الشفاف تماماً فوق زر "تسجيل" في الصفحة الثانية */
+        .register-clickable-btn {
+            position: absolute;
+            bottom: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 45%;
+            max-width: 280px;
+            height: 8%;
             background: transparent;
             cursor: pointer;
             border: none;
@@ -67,7 +81,7 @@
 
     <div class="container">
         
-        <!-- الصفحة الأولى (صورتك الفخمة بكامل الشاشة) -->
+        <!-- الصفحة الأولى (صورة الترحيب وزر أكمل) -->
         <div id="page1" class="page active">
             <div class="welcome-image-box">
                 <img src="/static/1791165368288.jpg" alt="ترحيب بوت نجم">
@@ -75,16 +89,12 @@
             </div>
         </div>
 
-        <!-- الصفحة الثانية -->
-        <div id="page2" class="page" style="flex-direction: column; background-color: #0b0713;">
-            <div class="fancy-box" style="max-width: 400px; width: 90%;">
-                <h2 style="margin-bottom: 20px; font-size: 22px;">ماذا نريد منكـ/ـي؟</h2>
-                <p class="welcome-text" style="font-size: 17px;">
-                    ما نبي منك سوى دعمنا ونشر بوت نجم لأي شخص تعرفه عشان يوصل لأكبر عدد ويستفيد الكل، وبيض الله وجهك مقدماً!
-                </p>
+        <!-- الصفحة الثانية (صورة ماذا نريد منك وزر تسجيل) -->
+        <div id="page2" class="page">
+            <div class="welcome-image-box">
+                <img src="/static/1791165964950.jpg" alt="ماذا نريد منك بوت نجم">
+                <button class="register-clickable-btn" onclick="registerUser()"></button>
             </div>
-
-            <button class="royal-btn" onclick="registerUser()">تسجيل</button>
         </div>
 
     </div>
