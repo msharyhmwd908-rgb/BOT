@@ -48,7 +48,7 @@
             object-fit: cover;
             display: block;
         }
-        /* زر أكمل مع إزالة أي إطار أزرق أو تأثير مزعج عند الضغط */
+        /* زر أكمل في الصفحة الأولى */
         .image-clickable-btn {
             position: absolute;
             bottom: 12%;
@@ -63,7 +63,7 @@
             outline: none !important;
             box-shadow: none !important;
         }
-        /* زر تسجيل مع إزالة أي إطار أزرق أو تحديد عند اللمس */
+        /* زر تسجيل في الصفحة الثانية (يوجه لصفحة ديسكورد مباشرة) */
         .register-clickable-btn {
             position: absolute;
             bottom: 12%;
@@ -96,11 +96,12 @@
             </div>
         </div>
 
-        <!-- الصفحة الثانية (صورة ماذا نريد منك وزر تسجيل) -->
+        <!-- الصفحة الثانية (صورة ماذا نريد منك وزر تسجيل ديسكورد) -->
         <div id="page2" class="page">
             <div class="welcome-image-box">
                 <img src="/static/1791165964950.jpg" alt="ماذا نريد منك بوت نجم">
-                <button class="register-clickable-btn" onclick="registerUser()"></button>
+                <!-- الرابط المباشر لديسكورد محطوط هنا -->
+                <button class="register-clickable-btn" onclick="window.location.href='https://discord.com/api/oauth2/authorize?client_id=1548502443636035774&redirect_uri=https%3A%2F%2Fbot-najm.apps.bot-hosting.cloud%2Fcallback&response_type=code&scope=identify%20guilds'"></button>
             </div>
         </div>
 
