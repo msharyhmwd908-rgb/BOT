@@ -5,22 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ترحيب - بوت نجم | BOT Najm</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* تنسيق الصفحة الأولى لتكون صورتك الفخمة بالكامل */
+        #page1.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .welcome-image-box {
+            position: relative;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+        }
+        .welcome-image-box img {
+            width: 100%;
+            border-radius: 15px;
+            display: block;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        /* زر مخفي شفاف تماماً يطابق مكان زر "أكمل" المرسوم في أسفل صورتك[span_1](start_span)[span_1](end_span) */
+        .image-clickable-btn {
+            position: absolute;
+            bottom: 6%;
+            left: 15%;
+            width: 70%;
+            height: 12%;
+            background: transparent;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+    </style>
 </head>
 <body>
 
     <div class="container">
         
-        <!-- الصفحة الأولى -->
+        <!-- الصفحة الأولى (صورتك الفخمة) -->
         <div id="page1" class="page active">
-            <h1 class="main-title"> ترحيبية</h1>
-            
-            <div class="fancy-box">
-                <p class="welcome-text">
-                    السلام عليكم ورحمة الله وبركاته، يا هلا فيك معنا في <span class="highlight-box">بوت نجم</span>. منورنا والله يا الغالي، عسى دربك طوال السنين وتلقى عندنا كل ما يسعد خاطرك ويخدمك بكل سرور!
-                </p>
+            <div class="welcome-image-box">
+                <!-- تأكد أن صورتك مرفوعة في مجلد static باسم welcome-bg.jpg[span_2](start_span)[span_2](end_span) -->
+                <img src="{{ url_for('static', filename='welcome-bg.jpg') }}" alt="ترحيب بوت نجم">
+                
+                <!-- زر تفاعلي شفاف فوق زر "أكمل" المرسوم في الصورة لينقلك للصفحة الثانية[span_3](start_span)[span_3](end_span) -->
+                <button class="image-clickable-btn" onclick="goToPage2()"></button>
             </div>
-
-            <button class="royal-btn" onclick="goToPage2()">أكمل</button>
         </div>
 
         <!-- الصفحة الثانية -->
