@@ -19,7 +19,7 @@ COGS_DIR = BASE_DIR / "cogs"
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 CLIENT_ID = "1548502443636035774"
-CLIENT_SECRET = "حط_هنا_الـ_Client_Secret_حقك"  # حط الـ Secret حقك هنا
+CLIENT_SECRET = "a26oXV8RjuIJz4aNpZNl9dG7aqRHwCZi"  
 REDIRECT_URI = "https://bot-najm.apps.bot-hosting.cloud/callback"
 
 
