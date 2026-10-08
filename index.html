@@ -58,7 +58,7 @@
             outline: none !important;
         }
 
-        /* تنسيق عناصر الداشبورد الملكية فوق الصورة الثالثة */
+        /* تنسيق عناصر الداشبورد الملكية فوق الصورة الخلفية */
         .user-avatar {
             position: absolute;
             top: 31.5%;
@@ -89,7 +89,7 @@
     <div class="container">
         
         <!-- الصفحة الأولى (الترحيب) -->
-        <div id="page1" class="page active">
+        <div id="page1" class="page">
             <div class="image-box">
                 <img src="/static/1791165368288.jpg" alt="ترحيب">
                 <button class="clickable-btn" onclick="showPage('page2')"></button>
@@ -104,10 +104,10 @@
             </div>
         </div>
 
-        <!-- صفحة الداشبورد الملكية (تفتح تلقائياً بعد تسجيل الدخول) -->
+        <!-- صفحة الداشبورد الملكية (تفتح تلقائياً للمستخدم المسجل دخوله) -->
         <div id="pageDashboard" class="page">
             <div class="image-box">
-                <!-- تم تصحيح اسم الصورة الخلفية هنا بدقة -->
+                <!-- اسم الصورة الخلفية الملكية الصحيح والمضبوط بالكامل -->
                 <img src="/static/file_0000000087c4820cb2f74d7bcc3800ff.png" alt="Dashboard">
                 
                 <!-- بيانات المستخدم المستخرجة من الفلاسك -->
@@ -130,11 +130,14 @@
             window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=1548502443636035774&redirect_uri=https%3A%2F%2Fbot-najm.apps.bot-hosting.cloud%2Fcallback&response_type=code&scope=identify%20guilds';
         }
 
-        // التحقق تلقائياً إذا تم جلب بيانات المستخدم من البايثون لعرض الداشبورد مباشرة
+        // التوجيه الذكي: زائر جديد يبدأ من صفحة الترحيب، مسجل مسبقاً يروح للداشبورد مباشرة
         window.onload = function() {
-            const isLogged = "{{ username }}";
-            if (isLogged && isLogged !== "") {
+            const isLogged = "{{ logged_in }}";
+            
+            if (isLogged === "true") {
                 showPage('pageDashboard');
+            } else {
+                showPage('page1');
             }
         };
     </script>
