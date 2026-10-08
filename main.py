@@ -19,7 +19,7 @@ COGS_DIR = BASE_DIR / "cogs"
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 CLIENT_ID = "1548502443636035774"
-CLIENT_SECRET = "a26oXV8RjuIJz4aNpZNl9dG7aqRHwCZi"  
+CLIENT_SECRET = "a26oXV8RjuIJz4aNpZNl9dG7aqRHwCZi"
 REDIRECT_URI = "https://bot-najm.apps.bot-hosting.cloud/callback"
 
 
@@ -45,11 +45,14 @@ app.secret_key = os.urandom(24)  # مفتاح سري لتشغيل الجلسات
 
 @app.route("/")
 def home():
+  # التحقق مما إذا كان المستخدم مسجلاً دخوله مسبقاً في الجلسة
+  logged_in = "username" in session
   return render_template(
       "index.html",
       username=session.get("username"),
       global_name=session.get("global_name"),
       avatar=session.get("avatar"),
+      logged_in="true" if logged_in else "false",
   )
 
 
@@ -99,7 +102,7 @@ def callback():
   else:
     session["avatar"] = "https://cdn.discordapp.com/embed/avatars/0.png"
 
-  # العودة للصفحة الرئيسية وهي تلقائياً بتفتح الداشبورد للمستخدم
+  # العودة للصفحة الرئيسية وتوجيه المستخدم المسجل للداشبورد مباشرة
   return redirect(url_for("home"))
 
 
