@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ترحيب - بوت نجم | BOT Najm</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>بوت نجم | BOT Najm</title>
     <style>
         body, html {
             margin: 0;
@@ -13,43 +12,39 @@
             height: 100%;
             background-color: #0b0713;
             overflow: hidden;
+            font-family: Tahoma, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
         .container {
             width: 100%;
             height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative;
         }
         .page {
             display: none;
             width: 100%;
             height: 100%;
-            justify-content: center;
-            align-items: center;
             position: absolute;
             top: 0;
             left: 0;
         }
         .page.active {
-            display: flex;
-            flex-direction: column;
+            display: block;
         }
-        .welcome-image-box {
+        .image-box {
             position: relative;
             width: 100vw;
             height: 100vh;
             text-align: center;
         }
-        .welcome-image-box img {
+        .image-box img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
         }
-        /* زر أكمل في الصفحة الأولى */
-        .image-clickable-btn {
+        /* أزرار التفاعل للصفحتين الأولى والثانية */
+        .clickable-btn {
             position: absolute;
             bottom: 12%;
             left: 50%;
@@ -61,52 +56,86 @@
             cursor: pointer;
             border: none;
             outline: none !important;
-            box-shadow: none !important;
         }
-        /* زر تسجيل في الصفحة الثانية (يوجه لصفحة ديسكورد مباشرة) */
-        .register-clickable-btn {
+
+        /* تنسيق عناصر الداشبورد الملكية فوق الصورة الثالثة */
+        .user-avatar {
             position: absolute;
-            bottom: 12%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 45%;
-            max-width: 280px;
-            height: 8%;
-            background: transparent;
-            cursor: pointer;
-            border: none;
-            outline: none !important;
-            box-shadow: none !important;
+            top: 31.5%;
+            left: 17.8%;
+            width: 17.5vw;
+            height: 31.5vh;
+            border-radius: 12px;
+            object-fit: cover;
         }
-        button:focus, button:active {
-            outline: none !important;
-            border: none !important;
+        .user-field {
+            position: absolute;
+            right: 28.5%;
+            width: 32vw;
+            color: #bfa15f;
+            font-size: 1.1vw;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            padding-right: 15px;
         }
+        .field-username { top: 29.5%; }
+        .field-name { top: 41.5%; }
+        .field-discord { top: 53.5%; }
     </style>
 </head>
 <body>
 
     <div class="container">
         
-        <!-- الصفحة الأولى (صورة الترحيب وزر أكمل) -->
+        <!-- الصفحة الأولى (الترحيب) -->
         <div id="page1" class="page active">
-            <div class="welcome-image-box">
-                <img src="/static/1791165368288.jpg" alt="ترحيب بوت نجم">
-                <button class="image-clickable-btn" onclick="goToPage2()"></button>
+            <div class="image-box">
+                <img src="/static/1791165368288.jpg" alt="ترحيب">
+                <button class="clickable-btn" onclick="showPage('page2')"></button>
             </div>
         </div>
 
-        <!-- الصفحة الثانية (صورة ماذا نريد منك وزر تسجيل ديسكورد) -->
+        <!-- الصفحة الثانية (ماذا نريد منك وزر ديسكورد) -->
         <div id="page2" class="page">
-            <div class="welcome-image-box">
-                <img src="/static/1791165964950.jpg" alt="ماذا نريد منك بوت نجم">
-                <!-- الرابط المباشر لديسكورد محطوط هنا -->
-                <button class="register-clickable-btn" onclick="window.location.href='https://discord.com/api/oauth2/authorize?client_id=1548502443636035774&redirect_uri=https%3A%2F%2Fbot-najm.apps.bot-hosting.cloud%2Fcallback&response_type=code&scope=identify%20guilds'"></button>
+            <div class="image-box">
+                <img src="/static/1791165964950.jpg" alt="ماذا نريد منك">
+                <button class="clickable-btn" onclick="loginDiscord()"></button>
+            </div>
+        </div>
+
+        <!-- صفحة الداشبورد الملكية (تفتح تلقائياً بعد تسجيل الدخول) -->
+        <div id="pageDashboard" class="page">
+            <div class="image-box">
+                <img src="/static/file_0000000087c4820cb2f74d7bcc309322.png" alt="Dashboard">
+                
+                <!-- بيانات المستخدم المستخرجة من الفلاسك -->
+                <img src="{{ avatar if avatar else '' }}" class="user-avatar" alt="Avatar">
+                <div class="user-field field-username">@{{ username if username else 'YourUser' }}</div>
+                <div class="user-field field-name">{{ global_name if global_name else 'Your Name' }}</div>
+                <div class="user-field field-discord">discord.gg/najm</div>
             </div>
         </div>
 
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function loginDiscord() {
+            window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=1548502443636035774&redirect_uri=https%3A%2F%2Fbot-najm.apps.bot-hosting.cloud%2Fcallback&response_type=code&scope=identify%20guilds';
+        }
+
+        // التحقق تلقائياً إذا تم جلب بيانات المستخدم من البايثون لعرض الداشبورد مباشرة
+        window.onload = function() {
+            const isLogged = "{{ username }}";
+            if (isLogged && isLogged !== "") {
+                showPage('pageDashboard');
+            }
+        };
+    </script>
 </body>
 </html>
