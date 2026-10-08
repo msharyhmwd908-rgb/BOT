@@ -58,16 +58,18 @@
             outline: none !important;
         }
 
-        /* تنسيق عناصر الداشبورد الملكية فوق الصورة الخلفية */
+        /* تنسيق الأفاتار ووزنها تماماً داخل الإطار على اليسار */
         .user-avatar {
             position: absolute;
-            top: 31.5%;
-            left: 17.8%;
-            width: 17.5vw;
-            height: 31.5vh;
-            border-radius: 12px;
+            top: 29.5%;
+            left: 14.8%;
+            width: 14vw;
+            height: 25vh;
+            border-radius: 8px;
             object-fit: cover;
         }
+        
+        /* تنسيق النصوص وتعديل أماكنها لتكون مرتبة */
         .user-field {
             position: absolute;
             right: 28.5%;
@@ -79,9 +81,9 @@
             align-items: center;
             padding-right: 15px;
         }
-        .field-username { top: 29.5%; }
-        .field-name { top: 41.5%; }
-        .field-discord { top: 53.5%; }
+        .field-username { top: 34.5%; }
+        .field-name { top: 45.5%; }
+        .field-discord { top: 56.5%; }
     </style>
 </head>
 <body>
@@ -104,16 +106,18 @@
             </div>
         </div>
 
-        <!-- صفحة الداشبورد الملكية (تفتح تلقائياً للمستخدم المسجل دخوله) -->
+        <!-- صفحة الداشبورد الملكية -->
         <div id="pageDashboard" class="page">
             <div class="image-box">
-                <!-- اسم الصورة الخلفية الملكية الصحيح والمضبوط بالكامل -->
+                <!-- خلفية الداشبورد الملكية -->
                 <img src="/static/file_0000000087c4820cb2f74d7bcc3800ff.png" alt="Dashboard">
                 
-                <!-- بيانات المستخدم المستخرجة من الفلاسك -->
+                <!-- صورة بروفايل المستخدم موزونة داخل الإطار -->
                 <img src="{{ avatar if avatar else '' }}" class="user-avatar" alt="Avatar">
-                <div class="user-field field-username">@{{ username if username else 'YourUser' }}</div>
-                <div class="user-field field-name">{{ global_name if global_name else 'Your Name' }}</div>
+                
+                <!-- عرض بيانات المستخدم الحقيقية -->
+                <div class="user-field field-username">@{{ username if username else '' }}</div>
+                <div class="user-field field-name">{{ global_name if global_name else '' }}</div>
                 <div class="user-field field-discord">discord.gg/najm</div>
             </div>
         </div>
@@ -130,7 +134,7 @@
             window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=1548502443636035774&redirect_uri=https%3A%2F%2Fbot-najm.apps.bot-hosting.cloud%2Fcallback&response_type=code&scope=identify%20guilds';
         }
 
-        // التوجيه الذكي: زائر جديد يبدأ من صفحة الترحيب، مسجل مسبقاً يروح للداشبورد مباشرة
+        // التوجيه الذكي للموقع
         window.onload = function() {
             const isLogged = "{{ logged_in }}";
             
